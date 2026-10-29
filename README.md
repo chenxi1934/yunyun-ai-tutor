@@ -1,8 +1,8 @@
 # 耘耘AI助教
 
-阶段 03 验证闭环：Python 3.12 / FastAPI / Pydantic / SQLite，共享串行 Agent Core，React / TypeScript / Vite / Tailwind 教师工作台。当前可真实调用百炼工具、读授权工作区、保存草稿、查看 diff、暂停审批及恢复会话。
+阶段 04 教育核心：Python 3.12 / FastAPI / Pydantic / SQLite，共享串行 Agent Core，React / TypeScript / Vite / Tailwind 教师工作台。当前可真实调用百炼工具、读授权工作区、保存草稿、查看 diff、暂停审批及恢复会话，并通过API完成结构化备课、班情导入、逐项修订和审核。
 
-**Python 草稿可经独立隔离 Runner 真实验证，失败最多自动修复两次；固定用例全部通过后才可待教师审核。** 教育结构化产出、正式批准/写入与教案包导出仍未开放。未配置 Runner 时明确返回 `RUNNER_UNAVAILABLE / NOT_TESTED`，PC/Web 均不降级为宿主 subprocess。
+**所有课堂示例和练习参考解须经独立隔离 Runner 真实验证，失败最多自动修复两次；固定用例全部通过后才可待教师审核。** 结构化教育功能由API/Agent工具提供，未新增教育界面。可导出教师逐项审核的JSON/Markdown/代码文件组合；正式批准/落盘与ZIP仍待阶段05。未配置 Runner 时明确返回 `RUNNER_UNAVAILABLE / NOT_TESTED`，PC/Web 均不降级为宿主 subprocess。
 
 ## 安装与配置
 
@@ -38,7 +38,7 @@ bash scripts/start-desktop.sh --workspace /绝对路径/教师教案目录
 npm --prefix frontend run dev
 ```
 
-Web 会话从两个明确标识为 NOT_TESTED 的合成种子文件复制独立工作区。服务端随机 HttpOnly / SameSite=Strict cookie 绑定资源归属；PC 有本机能力口令，变更请求校验 Origin/Host。当前只支持一个 API worker，同一实例串行运行任务。数据库默认 `.runtime/state.sqlite3`，重启保持目录和 cookie 可恢复，运行中的任务转为 INTERRUPTED，需教师点击继续。
+Web 会话从7个明确标识为 NOT_TESTED 的合成种子文件复制独立工作区。服务端随机 HttpOnly / SameSite=Strict cookie 绑定资源归属；PC 有本机能力口令，变更请求校验 Origin/Host。当前只支持一个 API worker，同一实例串行运行任务。数据库默认 `.runtime/state.sqlite3`，重启保持目录和 cookie 可恢复，运行中的任务转为 INTERRUPTED，需教师点击继续。
 
 ```bash
 docker build -t yunyun-tutor:stage02 .
@@ -100,3 +100,22 @@ npm --prefix frontend run build
 ```
 
 探针创建临时 Manager、候选容器与 Unix socket 转发，不发布公网端口，结束清理本次容器/镜像标签/远端源码。证据保存在忽略的 `.runtime/stage03-*.json/xml`。没有可用隔离器时如实失败，不在本机执行未知代码。容器共享宿主内核，Manager 的 Docker 权限是高信任边界；本阶段验证不等于公网生产加固或完整教育验收。
+
+## 阶段04：结构化备课API
+
+以下接口复用已建立的cookie与PC能力口令；当前不新增教育表单。`stage`在创建会话时显式选择`初中`或`大学`，大学同时传`grade: 大一`。主题仅支持《循环结构》。上传仅汇总合成/去标识数据，不传姓名、学号或学生代码。
+
+1. `POST /api/sessions/{sid}/class-profiles`：`{"format":"text","content":"5人未交、3人while死循环","expected_revision":0}`。返回事实、来源位置/Hash与未知项；会话revision递增。JSON格式为`{"class_size":40,"facts":[{"type":"boundary_error","count":8}]}`；CSV列为`type,count`，可选`class_size,denominator`。不支持推断未给出的0或人数交集。
+2. 文件上传：`POST /api/sessions/{sid}/class-profiles/upload?format=csv&expected_revision=0`，HTTP body为UTF-8文件原文（不是multipart），最多1 MiB/1000行。JSON同理`format=json`。冲突计数、负数、超分母、乱码均拒绝；无关个人信息列丢弃、不送模型。
+3. `GET /api/sessions/{sid}/education-context`取得事实预览、确定性策略、建议结构与固定用例。发送自然语言备课消息时使用最新会话revision，Agent调用`get_education_context → propose_lesson → verify_lesson`。也可把建议结构经教师编辑后`POST .../lessons`，body为`profile_id,profile_revision,base_revision,plan`；首次base_revision为0。
+4. `GET .../lessons/{lid}`查看全文、逐项revision/审核状态、代码报告ID、历史版本、失败尝试；`GET .../lessons/{lid}/json`下载**含未测/失败状态的草稿快照**，不表示可交付。完整执行日志由`GET /api/verification-reports/{report_id}`取得。
+5. `PATCH .../lessons/{lid}/items`：`expected_revision,item_id,replacement,reason`，replacement为该项目完整对象且保留ID；新版本保留父版本，必要代码/审核失效。环节时长单项修改仍须满足45分钟；同一班情不能换任务绕过测试。取历史项目内容再次PATCH即生成恢复草稿，原文件始终不变。
+6. `POST .../lessons/{lid}/verify`：`{"expected_revision":1}`，只重测需要验证的代码。`POST .../lessons/{lid}/reviews`：`expected_revision,item_id,decision: accept/reject,note`。逐项目接受/拒绝为教师独立API，模型无此工具。代码通过不自动接受目标、环节、错因或评分。
+7. 全部5份代码当前通过、无课程风险、班情未过期且全部项目接受后，`GET .../lessons/{lid}/export`返回`files`映射：JSON、Markdown、5份Python、用例、执行报告、文件Hash manifest。它是**教师已审核的草稿文件组合**；不写真实教师目录，不替代阶段05正式提交/ZIP。任一失败、漏测、过期、拒绝或待审核均阻断。
+
+可复跑验证（真实模型消耗既有实例预算，Key不上传）：
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit/test_education.py backend/tests/integration/test_education_api.py -q
+.venv/bin/python scripts/verify_stage04.py user@host --real-model
+```

@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "class_size": 40,
+  "prior_knowledge": [
+    "条件语句"
+  ],
+  "facts": [
+    {
+      "type": "not_submitted",
+      "count": 5
+    },
+    {
+      "type": "infinite_loop",
+      "count": 3
+    }
+  ]
+}

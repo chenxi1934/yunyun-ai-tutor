@@ -19,6 +19,13 @@ from app.domain import (
     sha,
     uid,
 )
+from app.education.models import (
+    EducationContext,
+    ProposeLesson,
+    ReadLesson,
+    ReviseLessonItem,
+    VerifyLesson,
+)
 from app.storage import Store
 from app.verification.service import VerificationService
 from app.workspaces import Workspace, is_python_path
@@ -37,6 +44,11 @@ class ToolSpec:
 
 
 SPECS = (
+    ToolSpec('get_education_context', '读取已导入班情、策略、固定任务契约和完整建议结构。建议不是测试/审核证据。', EducationContext, 'L0'),
+    ToolSpec('propose_lesson', '保存完整教案JSON；plan字段严格遵循get_education_context的suggested_plan结构。不能自报验证/审核。', ProposeLesson, 'L1'),
+    ToolSpec('read_lesson', '按教案ID读取当前完整结构、逐项审核状态和全部代码验证关联。', ReadLesson, 'L0'),
+    ToolSpec('revise_lesson_item', '保持ID修订单个教学项目，replacement为该项目完整对象。旧记录保留，必要验证/审核失效。', ReviseLessonItem, 'L1'),
+    ToolSpec('verify_lesson', '真实验证教案中全部示例和参考解，固定测试不可修改，逐项保留失败。', VerifyLesson, 'L2', timeout_seconds=175),
     ToolSpec("list_files", "列出已授权工作区的教学文本文件。", ListFiles, "L0"),
     ToolSpec("read_file", "读取工作区相对路径，返回真实内容和 SHA256。", ReadFile, "L0"),
     ToolSpec("read_draft", "按草稿ID读取当前会话的持久化草稿正文和版本。"
@@ -44,9 +56,9 @@ SPECS = (
     ToolSpec("propose_patch", "提出文件完整新内容或删除草稿，base_hash 须匹配实际文件；"
              "base_hash是正式文件Hash，不是草稿content_hash；新建文件未落盘时，首次和续改都用null。"
              "仅保存草稿，不改正式文件。", ProposePatch, "L1"),
-    ToolSpec("get_verification", "读取代码草稿的冻结测试规格与真实验证报告。先读取规格再测试；不能修改测试。",
+    ToolSpec("get_verification", "用于独立代码草稿：读取冻结规格与真实报告，不能改测试。整份教案请用verify_lesson批量验证。",
              GetVerification, "L0"),
-    ToolSpec("run_python_tests", "真实执行最新Python草稿及教师冻结的测试规格；失败返回逐用例日志。"
+    ToolSpec("run_python_tests", "用于独立代码草稿；完整教案使用verify_lesson。真实执行草稿及教师冻结规格，失败返回逐用例日志。"
              "只允许修复代码，不能改测试；最多两次修复。", RunPythonTests, "L2", timeout_seconds=35),
     ToolSpec("request_publish", "为草稿创建正式变更待审批并暂停；此工具不能批准或写入。"
              "正式提交尚未开放。", RequestPublish, "L3"),
@@ -59,9 +71,10 @@ def schemas() -> list[dict]:
 
 
 class Registry:
-    def __init__(self, store: Store, verification: VerificationService | None = None):
+    def __init__(self, store: Store, verification: VerificationService | None = None, education=None):
         self.store = store
         self.verification = verification
+        self.education = education
 
     @staticmethod
     def timeout_seconds(name: str) -> float:
@@ -111,7 +124,9 @@ class Registry:
     async def prepare_async(self, call, session, workspace):
         try:
             spec, args = self._arguments(call, session)
-            if spec.name in {"run_python_tests", "get_verification", "request_publish"} and self.verification:
+            if spec.name == 'verify_lesson':
+                return {'education_verified': await self.education.verify(session['id'], args.lesson_id, args.expected_revision)}
+            if spec.name in {"run_python_tests", "get_verification", "request_publish", "read_lesson"} and self.verification:
                 if spec.name == "run_python_tests":
                     return {"report": await self.verification.prepare(
                         session["id"], args.draft_id, args.test_spec_revision)}
@@ -153,6 +168,10 @@ class Registry:
             data = self._handle(spec.name, args, call, session, workspace, prepared)
             return self._result(call, data=data)
         except (ValidationError, AppError) as error:
+            if call['name'] in {'propose_lesson', 'revise_lesson_item', 'verify_lesson'}:
+                self.store.put('education_attempts', {'id': uid(), 'session_id': session['id'],
+                    'call_id': call['id'], 'run_id': call['run_id'], 'tool': call['name'],
+                    'arguments': call['arguments'], 'error': self.error_result(call, error)['error'], 'created_at': now()})
             return self.error_result(call, error)
 
     def _draft(self, draft_id: str, sid: str) -> dict:
@@ -165,6 +184,19 @@ class Registry:
         sid, rid = session["id"], call["run_id"]
         if self.verification and prepared and "runner_identity" in prepared:
             self.verification.refresh(sid, prepared["runner_identity"])
+        if name == 'get_education_context':
+            return self.education.context(sid)
+        if name == 'propose_lesson':
+            return self.education.tool_result(self.education.propose(session, args.plan, args.profile_id,
+                args.profile_revision, args.base_revision, rid))
+        if name == 'read_lesson':
+            return self.education.view(sid, args.lesson_id)
+        if name == 'revise_lesson_item':
+            return self.education.tool_result(self.education.revise(session, args.lesson_id, args, rid))
+        if name == 'verify_lesson':
+            if not prepared or 'education_verified' not in prepared:
+                raise AppError('RUNNER_UNAVAILABLE', '教案尚未真实验证。', 503)
+            return self.education.tool_result(prepared['education_verified'])
         if name == "get_verification":
             draft = self.verification.draft(sid, args.draft_id)
             spec = self.verification.latest_spec(sid, draft["path"])
@@ -182,6 +214,9 @@ class Registry:
                 "path", "content", "content_hash", "base_hash", "revision", "parent_id",
                 "operation", "status", "verification_status", "mock")}}
         if name == "propose_patch":
+            if any(args.path == self.store.get('drafts', did)['path']
+                   for lesson in self.store.find('lessons', sid) for did in lesson['bindings'].values()):
+                raise AppError('EDUCATION_ITEM_REQUIRED', '教案关联代码须用revise_lesson_item修订，保留结构与验证绑定。', 409)
             original = prepared["file"] if prepared is not None else ws.read(args.path, allow_missing=True)
             if original["hash"] != args.base_hash:
                 raise AppError("REVISION_CONFLICT", "文件已变化，请重新读取后提出草稿。", 409)
@@ -216,6 +251,9 @@ class Registry:
             return self.verification.commit(prepared["report"])
         if name == "request_publish":
             draft = self._draft(args.draft_id, sid)
+            lessons = self.store.find('lessons', sid)
+            if lessons and not self.education.view(sid, lessons[-1]['lesson_id'])['delivery_ready']:
+                raise AppError('EDUCATION_REVIEW_REQUIRED', '教育产物须完成代码验证和教师逐项审核。', 409)
             current = prepared["file"] if prepared is not None else ws.read(draft["path"], allow_missing=True)
             if current["hash"] != draft["base_hash"]:
                 raise AppError("REVISION_CONFLICT", "正式文件已变化，需重新生成草稿。", 409)

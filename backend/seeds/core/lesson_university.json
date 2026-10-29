@@ -1,0 +1,257 @@
+{
+  "notice": "合成规则种子，NOT_TESTED，未经过教师审核。",
+  "plan": {
+    "stage": "大学",
+    "topic": "循环结构",
+    "duration_minutes": 45,
+    "prerequisites": [
+      "变量",
+      "输入输出",
+      "条件语句"
+    ],
+    "goals": [
+      {
+        "id": "goal-1",
+        "title": "解释循环执行与退出",
+        "criterion": "独立填写n=0/1/5的变量追踪表，正确指出条件更新。"
+      },
+      {
+        "id": "goal-2",
+        "title": "循环不变量与复杂度",
+        "criterion": "论证不变量与终止性，分析嵌套循环时间/空间复杂度。"
+      }
+    ],
+    "segments": [
+      {
+        "id": "segment-1",
+        "title": "先修诊断",
+        "minutes": 5,
+        "activity": "用条件语句与变量更新小题诊断；给未交者补交机会，原因待核实。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-2",
+        "title": "不变量论证",
+        "minutes": 8,
+        "activity": "追踪累加器；给出循环不变量、初始化/保持/退出论证。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-3",
+        "title": "终止性分析",
+        "minutes": 10,
+        "activity": "用递减量说明终止，辨析break的作用域与嵌套循环。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-4",
+        "title": "边界对比",
+        "minutes": 10,
+        "activity": "比较range(1,n)与range(1,n+1)，手算n=0/1并解释差异。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-5",
+        "title": "复杂度与练习",
+        "minutes": 10,
+        "activity": "完成约数与素数计数；解释最坏时间复杂度和空间复杂度。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-6",
+        "title": "出口测",
+        "minutes": 2,
+        "activity": "说明零次循环与一次循环的条件，提交一行变量追踪记录。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "example-1",
+        "title": "演示：sum",
+        "task_id": "sum",
+        "knowledge_points": [
+          "循环",
+          "条件更新"
+        ],
+        "explanation": "逐轮解释循环不变量和最坏复杂度。",
+        "code": "n=int(input())\ni=1\ntotal=0\nwhile i<=n:\n    total+=i\n    i+=1\nprint(total)\n"
+      },
+      {
+        "id": "example-2",
+        "title": "演示：pairs",
+        "task_id": "pairs",
+        "knowledge_points": [
+          "嵌套循环",
+          "复杂度"
+        ],
+        "explanation": "逐轮解释循环不变量和最坏复杂度。",
+        "code": "n=int(input())\ncount=0\nfor i in range(1,n+1):\n    for j in range(1,i+1):\n        count+=1\nprint(count)\n"
+      }
+    ],
+    "exercises": [
+      {
+        "id": "exercise-1",
+        "title": "基础：sum",
+        "task_id": "sum",
+        "knowledge_points": [
+          "循环不变量",
+          "终止性",
+          "复杂度"
+        ],
+        "explanation": "不变量：每次while判断前total等于1到i-1的和。初始化i=1、total=0成立；先累加i再令i加1，保持该不变量；退出时i=n+1，得到1到n的和。终止性：非负递减量n-i+1每轮减1。n=0直接退出并输出0。复杂度：时间O(n)，额外空间O(1)。",
+        "code": "n=int(input())\ni=1\ntotal=0\nwhile i<=n:\n    total+=i\n    i+=1\nprint(total)\n",
+        "level": "基础",
+        "prompt": "输入整数n，0≤n≤10000；输出1到n的整数和；n=0输出0。",
+        "scaffolding": "请独立论证终止性并给出最坏复杂度。",
+        "scoring": [
+          {
+            "criterion": "程序与输出正确",
+            "points": 50
+          },
+          {
+            "criterion": "循环不变量及终止性论证",
+            "points": 30
+          },
+          {
+            "criterion": "时间与空间复杂度分析",
+            "points": 20
+          }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "title": "进阶：divisors",
+        "task_id": "divisors",
+        "knowledge_points": [
+          "循环不变量",
+          "终止性",
+          "复杂度"
+        ],
+        "explanation": "不变量：处理i前count等于1到i-1中n的约数个数。初始化count=0；仅在n%i==0时加1，保持对已检查区间的计数；退出时已检查1到n全部整数。终止性：有限range(1,n+1)每轮前进一步。n=1只有约数1，输出1。复杂度：时间O(n)，额外空间O(1)。",
+        "code": "n=int(input())\ncount=0\nfor i in range(1,n+1):\n    if n%i==0:\n        count+=1\nprint(count)\n",
+        "level": "进阶",
+        "prompt": "输入正整数n，1≤n≤1000；用循环输出n的正约数个数。",
+        "scaffolding": "请独立论证终止性并给出最坏复杂度。",
+        "scoring": [
+          {
+            "criterion": "程序与输出正确",
+            "points": 50
+          },
+          {
+            "criterion": "循环不变量及终止性论证",
+            "points": 30
+          },
+          {
+            "criterion": "时间与空间复杂度分析",
+            "points": 20
+          }
+        ]
+      },
+      {
+        "id": "exercise-3",
+        "title": "挑战：primes",
+        "task_id": "primes",
+        "knowledge_points": [
+          "循环不变量",
+          "终止性",
+          "复杂度"
+        ],
+        "explanation": "外层不变量：处理x前count是区间[2,x)中素数个数。初始化count=0；内层检查已试除的整数，发现因子则prime=False并break，否则保持无因子的判断；内层结束后按prime增加count，保持外层不变量；退出后统计完2到n。终止性：内外层均为有限range，break只退出最内层。x=2时内层为空，仍计为素数；n=0/1时无候选，输出0。复杂度：最坏时间上界O(n²)，额外空间O(1)。",
+        "code": "n=int(input())\ncount=0\nfor x in range(2,n+1):\n    prime=True\n    for d in range(2,x):\n        if x%d==0:\n            prime=False\n            break\n    if prime:\n        count+=1\nprint(count)\n",
+        "level": "挑战",
+        "prompt": "输入整数n，0≤n≤100；用嵌套循环和break统计不超过n的素数个数。",
+        "scaffolding": "请独立论证终止性并给出最坏复杂度。",
+        "scoring": [
+          {
+            "criterion": "程序与输出正确",
+            "points": 50
+          },
+          {
+            "criterion": "循环不变量及终止性论证",
+            "points": 30
+          },
+          {
+            "criterion": "时间与空间复杂度分析",
+            "points": 20
+          }
+        ]
+      }
+    ],
+    "misconceptions": [
+      {
+        "id": "risk-not_submitted",
+        "title": "先修掌握待诊断",
+        "misconception_type": "not_submitted",
+        "evidence_ids": [
+          "fact-not_submitted"
+        ],
+        "basis": "observed",
+        "trigger": "要求独立填写循环前置条件",
+        "cause": "可能是提交障碍或先修尚未掌握，不能由未交直接推断能力。",
+        "cause_status": "hypothesis",
+        "teaching_intervention": "先做低压力条件判断诊断，允许补交并核对提交障碍。 大学课要求用不变量和递减量说明。",
+        "exercise_ids": [
+          "exercise-1"
+        ],
+        "stage": "大学"
+      },
+      {
+        "id": "risk-infinite_loop",
+        "title": "循环不终止",
+        "misconception_type": "infinite_loop",
+        "evidence_ids": [
+          "fact-infinite_loop"
+        ],
+        "basis": "observed",
+        "trigger": "while条件保持真且状态不变",
+        "cause": "可能漏写更新或更新方向错误，需用追踪表确认。",
+        "cause_status": "hypothesis",
+        "teaching_intervention": "手工跟踪初值/条件/更新；先预测退出点，受限运行后讨论超时。 大学课要求用不变量和递减量说明。",
+        "exercise_ids": [
+          "exercise-1"
+        ],
+        "stage": "大学"
+      },
+      {
+        "id": "risk-boundary_error",
+        "title": "循环边界漏项",
+        "misconception_type": "boundary_error",
+        "evidence_ids": [],
+        "basis": "predicted",
+        "trigger": "误把range终点当作包含",
+        "cause": "可能混淆开闭区间，须用n=0/1和最大项核实。",
+        "cause_status": "hypothesis",
+        "teaching_intervention": "并列手算零次/一次循环，解释n与n+1；强调边界评分点。 大学课要求用不变量和递减量说明。",
+        "exercise_ids": [
+          "exercise-2"
+        ],
+        "stage": "大学"
+      }
+    ]
+  }
+}

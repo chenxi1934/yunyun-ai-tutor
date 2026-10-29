@@ -75,12 +75,18 @@ def live_probe(socket, token, output):
     return asyncio.run(run())
 
 
-def main():
+def main(test_files=None, live_function=live_probe, default_prefix='stage03'):
     parser = argparse.ArgumentParser()
     parser.add_argument('target', help='已登录的 SSH 别名或 user@host')
     parser.add_argument('--real-model', action='store_true')
-    parser.add_argument('--evidence-prefix', default='stage03', help='本轮证据文件名前缀')
+    parser.add_argument('--recheck-artifacts', action='store_true', help='复验已有真实生成产物，本次不调用模型')
+    parser.add_argument('--model-only', action='store_true', help='仅重跑真实模型；本次pytest明确记为NOT_TESTED')
+    parser.add_argument('--evidence-prefix', default=default_prefix, help='本轮证据文件名前缀')
     args = parser.parse_args()
+    if args.model_only and not (args.real_model or args.recheck_artifacts):
+        parser.error('--model-only需要--real-model或--recheck-artifacts')
+    if args.real_model and args.recheck_artifacts:
+        parser.error('--real-model和--recheck-artifacts不能同时使用')
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}', args.evidence_prefix):
         parser.error('证据前缀仅允许字母、数字、下划线和连字符')
     prefix = args.evidence_prefix
@@ -140,12 +146,17 @@ def main():
                 time.sleep(.1)
             env = {**os.environ, 'YUNYUN_TEST_RUNNER_SOCKET': str(socket),
                    'YUNYUN_TEST_RUNNER_TOKEN': token}
-            tests = subprocess.run([str(PROJECT_ROOT / '.venv/bin/python'), '-m', 'pytest',
-                'backend/tests/integration/test_verification.py', '-q',
-                f'--junitxml=.runtime/{prefix}-real-tests.xml', '-o', 'junit_family=xunit1'], env=env)
-            summary['pytest_exit_code'] = tests.returncode
-            if tests.returncode:
-                raise RuntimeError('真实隔离回归失败')
+            if args.model_only:
+                summary['pytest_status'] = 'NOT_TESTED'
+                summary['pytest_reason'] = 'explicit --model-only; prior evidence is separate'
+            else:
+                tests = subprocess.run([str(PROJECT_ROOT / '.venv/bin/python'), '-m', 'pytest',
+                    *(test_files or ['backend/tests/integration/test_verification.py']), '-q',
+                    f'--junitxml=.runtime/{prefix}-real-tests.xml', '-o', 'junit_family=xunit1'], env=env)
+                summary['pytest_exit_code'] = tests.returncode
+                summary['pytest_status'] = 'PASS' if tests.returncode == 0 else 'FAIL'
+                if tests.returncode:
+                    raise RuntimeError('真实隔离回归失败')
             # 故障注入仅操作本次Manager与测试容器，模拟Manager被SIGKILL遗留作业。
             orphan = 'yunyun-stage03-orphan-' + ident
             orphan_id = command(shlex.join(['docker', 'run', '-d', '--name', orphan,
@@ -169,8 +180,10 @@ def main():
             assert not left
             summary['restart_orphan_cleanup'] = {'status': 'PASS', 'orphan_id': orphan_id,
                                                 'remaining': left, 'identity': identity}
-            if args.real_model:
-                summary['live_model'] = live_probe(socket, token, runtime / f'{prefix}-live-model.json')
+            if args.real_model or args.recheck_artifacts:
+                key = 'live_model' if args.real_model else 'artifact_recheck'
+                suffix = 'live-model' if args.real_model else 'artifact-recheck'
+                summary[key] = live_function(socket, token, runtime / f'{prefix}-{suffix}.json')
             summary['runtime_digest'] = digest
             summary['manager_image'] = command("docker image inspect --format '{{.Id}}' " + image,
                                               capture_output=True, text=True).stdout.strip()
@@ -186,8 +199,9 @@ def main():
             subprocess.run([*ssh, 'docker image rm ' + image], stdout=subprocess.DEVNULL)
             subprocess.run([*ssh, 'python3 -c ' + shlex.quote('import shutil;shutil.rmtree(' + repr(remote) + ')')])
             summary['test_source_hashes'] = {str(p.relative_to(PROJECT_ROOT)): sha(p.read_text())
-                for p in (PROJECT_ROOT / 'backend/tests/integration/test_verification.py',
-                          PROJECT_ROOT / 'scripts/verify_stage03.py')}
+                for p in (PROJECT_ROOT / name for name in
+                          [*(test_files or ['backend/tests/integration/test_verification.py']),
+                           'scripts/verify_stage03.py', 'scripts/verify_stage04.py']) if p.exists()}
             summary['source_hashes'] = {str(p.relative_to(PROJECT_ROOT)): sha(p.read_text()) for folder
                 in ('backend/app', 'runner') for p in (PROJECT_ROOT / folder).rglob('*.py')}
             (runtime / f'{prefix}-summary.json').write_text(dumps(summary), encoding='utf-8')

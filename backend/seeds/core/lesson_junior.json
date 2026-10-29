@@ -1,0 +1,269 @@
+{
+  "notice": "合成规则种子，NOT_TESTED，未经过教师审核。",
+  "plan": {
+    "stage": "初中",
+    "topic": "循环结构",
+    "duration_minutes": 45,
+    "prerequisites": [
+      "变量",
+      "输入输出",
+      "条件语句"
+    ],
+    "goals": [
+      {
+        "id": "goal-1",
+        "title": "解释循环执行与退出",
+        "criterion": "独立填写n=0/1/5的变量追踪表，正确指出条件更新。"
+      },
+      {
+        "id": "goal-2",
+        "title": "完成循环任务",
+        "criterion": "用for/while完成计数与累加；解释零次与边界输入。"
+      }
+    ],
+    "segments": [
+      {
+        "id": "segment-1",
+        "title": "先修诊断",
+        "minutes": 5,
+        "activity": "用条件语句与变量更新小题诊断；给未交者补交机会，原因待核实。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-2",
+        "title": "循环演示",
+        "minutes": 8,
+        "activity": "逐行追踪计数与累加；先预测再运行n=0/1/5。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-3",
+        "title": "终止追踪",
+        "minutes": 10,
+        "activity": "画初值→条件→循环体→更新表，说明何时退出。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-4",
+        "title": "边界对比",
+        "minutes": 10,
+        "activity": "比较range(1,n)与range(1,n+1)，手算n=0/1并解释差异。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-5",
+        "title": "分层练习",
+        "minutes": 10,
+        "activity": "基础独立完成，进阶结合条件，挑战解释去重；教师逐题审核。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      },
+      {
+        "id": "segment-6",
+        "title": "出口测",
+        "minutes": 2,
+        "activity": "说明零次循环与一次循环的条件，提交一行变量追踪记录。",
+        "strategy_ids": [
+          "strategy-core",
+          "strategy-not_submitted",
+          "strategy-infinite_loop"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "example-1",
+        "title": "演示：count",
+        "task_id": "count",
+        "knowledge_points": [
+          "循环",
+          "条件更新"
+        ],
+        "explanation": "逐轮记录变量，比较零次、一次和正常循环。",
+        "code": "n=int(input())\nfor i in range(1,n+1):\n    print(i)\n"
+      },
+      {
+        "id": "example-2",
+        "title": "演示：sum",
+        "task_id": "sum",
+        "knowledge_points": [
+          "循环",
+          "条件更新"
+        ],
+        "explanation": "逐轮记录变量，比较零次、一次和正常循环。",
+        "code": "n=int(input())\ni=1\ntotal=0\nwhile i<=n:\n    total+=i\n    i+=1\nprint(total)\n"
+      }
+    ],
+    "exercises": [
+      {
+        "id": "exercise-1",
+        "title": "基础：countdown",
+        "task_id": "countdown",
+        "knowledge_points": [
+          "计数",
+          "累加",
+          "条件更新"
+        ],
+        "explanation": "先手算，再填追踪表，最后运行核对。",
+        "code": "n=int(input())\nwhile n>0:\n    print(n)\n    n-=1\n",
+        "level": "基础",
+        "prompt": "输入整数n，0≤n≤100；逐行输出n到1，n=0无输出。",
+        "scaffolding": "追踪表：初值｜进入条件｜本轮输出｜更新后值。",
+        "scoring": [
+          {
+            "criterion": "初值与条件正确",
+            "points": 25
+          },
+          {
+            "criterion": "变量更新与结果正确",
+            "points": 35
+          },
+          {
+            "criterion": "零次/边界追踪解释",
+            "points": 20
+          },
+          {
+            "criterion": "初值/条件/更新追踪表",
+            "points": 20
+          }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "title": "进阶：even_sum",
+        "task_id": "even_sum",
+        "knowledge_points": [
+          "计数",
+          "累加",
+          "条件更新"
+        ],
+        "explanation": "先手算，再填追踪表，最后运行核对。",
+        "code": "n=int(input())\ntotal=0\nfor i in range(1,n+1):\n    if i%2==0:\n        total+=i\nprint(total)\n",
+        "level": "进阶",
+        "prompt": "输入整数n，0≤n≤10000；输出不超过n的正偶数之和；无偶数输出0。",
+        "scaffolding": "追踪表：初值｜进入条件｜本轮输出｜更新后值。",
+        "scoring": [
+          {
+            "criterion": "初值与条件正确",
+            "points": 25
+          },
+          {
+            "criterion": "变量更新与结果正确",
+            "points": 35
+          },
+          {
+            "criterion": "零次/边界追踪解释",
+            "points": 20
+          },
+          {
+            "criterion": "初值/条件/更新追踪表",
+            "points": 20
+          }
+        ]
+      },
+      {
+        "id": "exercise-3",
+        "title": "挑战：multiples",
+        "task_id": "multiples",
+        "knowledge_points": [
+          "计数",
+          "累加",
+          "条件更新"
+        ],
+        "explanation": "先手算，再填追踪表，最后运行核对。",
+        "code": "n=int(input())\ntotal=0\nfor i in range(1,n+1):\n    if i%3==0 or i%5==0:\n        total+=i\nprint(total)\n",
+        "level": "挑战",
+        "prompt": "输入整数n，0≤n≤10000；输出1到n中是3或5倍数的数之和，公共倍数只计一次。",
+        "scaffolding": "追踪表：初值｜进入条件｜本轮输出｜更新后值。",
+        "scoring": [
+          {
+            "criterion": "初值与条件正确",
+            "points": 25
+          },
+          {
+            "criterion": "变量更新与结果正确",
+            "points": 35
+          },
+          {
+            "criterion": "零次/边界追踪解释",
+            "points": 20
+          },
+          {
+            "criterion": "初值/条件/更新追踪表",
+            "points": 20
+          }
+        ]
+      }
+    ],
+    "misconceptions": [
+      {
+        "id": "risk-not_submitted",
+        "title": "先修掌握待诊断",
+        "misconception_type": "not_submitted",
+        "evidence_ids": [
+          "fact-not_submitted"
+        ],
+        "basis": "observed",
+        "trigger": "要求独立填写循环前置条件",
+        "cause": "可能是提交障碍或先修尚未掌握，不能由未交直接推断能力。",
+        "cause_status": "hypothesis",
+        "teaching_intervention": "先做低压力条件判断诊断，允许补交并核对提交障碍。",
+        "exercise_ids": [
+          "exercise-1"
+        ],
+        "stage": "初中"
+      },
+      {
+        "id": "risk-infinite_loop",
+        "title": "循环不终止",
+        "misconception_type": "infinite_loop",
+        "evidence_ids": [
+          "fact-infinite_loop"
+        ],
+        "basis": "observed",
+        "trigger": "while条件保持真且状态不变",
+        "cause": "可能漏写更新或更新方向错误，需用追踪表确认。",
+        "cause_status": "hypothesis",
+        "teaching_intervention": "手工跟踪初值/条件/更新；先预测退出点，受限运行后讨论超时。",
+        "exercise_ids": [
+          "exercise-1"
+        ],
+        "stage": "初中"
+      },
+      {
+        "id": "risk-boundary_error",
+        "title": "循环边界漏项",
+        "misconception_type": "boundary_error",
+        "evidence_ids": [],
+        "basis": "predicted",
+        "trigger": "误把range终点当作包含",
+        "cause": "可能混淆开闭区间，须用n=0/1和最大项核实。",
+        "cause_status": "hypothesis",
+        "teaching_intervention": "并列手算零次/一次循环，解释n与n+1；强调边界评分点。",
+        "exercise_ids": [
+          "exercise-2"
+        ],
+        "stage": "初中"
+      }
+    ]
+  }
+}

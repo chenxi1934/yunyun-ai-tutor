@@ -38,7 +38,10 @@ def test_api_flow_sse_replay_and_idempotency(web_app):
         assert state["tool_calls"][-1]["name"] == "read_file"
         assert client.post(f'/api/sessions/{session["id"]}/messages', json=data).json()["run_id"] == rid
         listing = client.get(f'/api/workspaces/{session["workspace_id"]}/files').json()["files"]
-        assert len(listing) == 2
+        assert {f['path'] for f in listing} == {
+            'README.md', 'example.py', 'class_A.json', 'class_A.txt', 'class_B.csv',
+            'lesson_junior.json', 'lesson_university.json',
+        }
         assert client.get(f'/api/workspaces/{session["workspace_id"]}/file', params={"path": "../x.md"}).status_code == 403
         stream = client.get(f'/api/sessions/{session["id"]}/events?after=1&follow=false')
         assert stream.status_code == 200 and "event: agent" in stream.text and "id: 1\n" not in stream.text

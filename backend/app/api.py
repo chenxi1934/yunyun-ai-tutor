@@ -12,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.agent import Agent
 from app.config import PROJECT_ROOT, Settings
 from app.domain import AppError, Decision, NewMessage, NewSession, Resume, dumps, sha, uid
+from app.education.api import register_education
 from app.providers import Provider
 from app.storage import Store
 from app.verification.models import FreezeTests
@@ -60,7 +61,8 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
                 size = 999999
-            if size > 262144:
+            limit = 1052672 if '/class-profiles' in request.url.path else 262144
+            if size > limit:
                 return failure(AppError("REQUEST_TOO_LARGE", "请求内容过大。", 413), request.state.request_id)
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
@@ -111,6 +113,8 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
 
         if run["status"] == "READY" and (rid not in tasks or tasks[rid].done()):
             tasks[rid] = asyncio.create_task(execute())
+
+    register_education(app, agent, session, result, execution_lock)
 
     @app.get("/api/health")
     async def health(request: Request):

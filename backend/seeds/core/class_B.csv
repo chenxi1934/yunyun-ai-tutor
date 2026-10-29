@@ -1,0 +1,4 @@
+type,count,class_size
+not_submitted,0,40
+infinite_loop,0,40
+boundary_error,8,40

@@ -5,9 +5,9 @@
 | 阶段 | 状态 | 验收证据 | 阻塞/风险 |
 |---|---|---|---|
 | 1. 设计/骨架/预部署 | PARTIAL：设计/骨架/远端临时容器验证完成 | 阶段02命令与下方证据；远端 Python 3.12 / Node 22 镜像构建及进程恢复通过 | 公网入口/HTTPS与独立 Runner 尚未交付 |
-| 2. Agent Core | Review两项缺陷已修复；针对性回归PASS | 当前62项pytest、真实百炼草稿取回；旧版本九项证据保留为历史，本轮未全量重跑 | run_python_tests 明确不可用；正式批准/提交待阶段03/05；当前完整九项复验NOT_TESTED |
-| 3. 正确性验证 | NOT_STARTED | 无真实执行报告 | 独立 Runner 与隔离尚未实现/验证 |
-| 4. 教育能力 | NOT_STARTED | 仅协议/策略与用例设计 | 尚无真实生成及两班情/两学段对照 |
+| 2. Agent Core | 已实现；专项修复归档阈值与验证工具指令冲突 | 当前151项后端回归PASS；真实模型整课批量验证 | 正式发布/浏览器待阶段05；直连模型网络稳定性待部署确认 |
+| 3. 正确性验证 | 已实现；真实隔离、错误/修复/过期阻断 | 阶段03第11节125项历史验收；阶段04另有真实回归 | 临时隔离器按次创建/清理，尚非持续部署 |
+| 4. 教育能力 | 两班情与大学真实生成、逐项文案修订及复验PASS | 151后端+8真实教育集成；最终15程序/51用例PASS；专项验收末节有差异与完整证据 | 真实教师审核仍PENDING；教育UI/正式发布未验收 |
 | 5. PC/Web | NOT_STARTED（启动/部署骨架已在02建立） | 本机和VPS临时容器可运行共享API与静态前端；无公网/整包证据 | 正式提交、导出、HTTPS及完整双端教育验收待实现 |
 | 6. 回归与交付 | NOT_STARTED | 未运行产品回归，未生成视频/交付链接 | 依赖前五阶段与人工教育审核 |
 
@@ -291,3 +291,118 @@ git diff --check
 相关后端回归96 PASS，34项策略测试包含在这96项内，不重复累计。真实Runner结果与证据见ACCEPTANCE第11节。本轮不调用真实模型、不修改前端、不启动浏览器；未改生产配置、`.env`、依赖/锁文件或CI，未提交/推送Git。
 
 最终结果：96项相关后端回归（约7.64秒，含34项策略测试）+29项真实Runner集成（约87.61秒）=125 PASS，0失败/0跳过。`.py/.PY/.pY`均真实失败/通过/编辑失效，所有拒绝场景审批数0，整组检查包含大写文件；源码/测试Hash核验一致。ruff与git diff --check通过。证据见ACCEPTANCE第11节及`.runtime/stage03-suffix-*.xml/json`。远端候选/Manager容器、镜像标签、临时源码目录独立查询为空，SSH控制连接已关闭；本轮不保留运行服务。
+
+## 2026-10-29：阶段04 — 教育垂类核心与完整循环课
+
+起始`git status --short`为空。已阅读AGENTS、原始要求、PLAN/PROGRESS、阶段04 prompt、Agent/Registry/Store/API及真实Runner实现；本轮未使用多Agent、未修改前端、未启动浏览器或本地开发服务，未改.env/锁文件/生产配置，未提交或推送Git。
+
+### 本轮实现
+
+- `backend/app/education/models.py`：严格Pydantic教案、目标/可观察标准、环节、2–3示例、三档题、每题100分评分点、结构化错因；强制45分钟、唯一稳定ID、正确引用和三档各一题。持久化版本在SQLite新增教育实体表，沿用现有Store，不新增迁移脚本或修改现有数据。
+- `profiles.py/rules.py/catalog.py`：粘贴文本、UTF-8 JSON/CSV原文上传；上限1 MiB/1000行；三类观察分别保留计数/分母/来源位置/Hash，交集未知不合计，未知人数不算比例，未提供的类别不当作0。负数、小数、约数、重复JSON字段/CSV列、冲突、超分母、乱码均拒绝。只保留汇总白名单，姓名/学号等无关列不持久化、不送模型。
+- A班（5未交、3死循环）为`5+8+10+10+10+2`分钟；B班（明确0未交、0死循环、8边界错误）为`2+8+8+15+10+2`分钟。A提供while初值/条件/更新追踪，B更换第二个演示为偶数累加、增加边界支架与边界评分。大学改为不变量/终止性/复杂度目标、嵌套循环示例、约数/素数题，评分为程序50/论证30/复杂度20。不是改班名或语气。
+- 错因保留`misconception_type/evidence_ids/basis/trigger/cause/cause_status/teaching_intervention/exercise_ids/stage`。观察只说明行为，所有病因仍为hypothesis；没有同类非零事实的结论只能标predicted。非零观察不得遗漏干预；未知项和事实引用可复查。
+- `service.py/render.py`：稳定lesson/item ID、递增revision、父版本、Hash、班情revision、代码/规格/报告关联、逐项教师接受/拒绝与审核记录。单项修订保留旧版本；只改环节不重跑代码，改一题仅重测该题并使关联错因审核失效；班情变化使整体适配/审核失效。历史项目可作为replacement生成恢复草稿，正式文件不动。
+- 全部示例/参考解由固定任务契约冻结用例，调用阶段03真实VerificationService/Runner，包含正常、最小/零次与边界；语法错误、输出错误、超时、漏测、过期、执行器不可用均不能成为可交付候选。不可删除失败项、换任务或删减用例过关；通用propose_patch不能绕开教案绑定。模型修复额度仍为每文件两次，不因提新教案/恢复重置。代码PASS不能消除课程风险或自动接受教学内容。
+- `education/api.py`及Agent/Registry：导入、结构预览、生成、单项修改、整课验证、逐项审核、历史/草稿JSON、审核后文件组合导出。模型只有读取/提案/受限验证工具；教师审核不注册为工具。导出返回JSON/Markdown/5份Python/用例/报告/manifest映射，所有文件Hash可核；这是已审核**草稿组合**，阶段05再处理正式落盘/ZIP。
+- `backend/seeds/core/`现在共7文件，含A班JSON/文本、B班CSV、初中/大学完整结构种子，均标注合成、NOT_TESTED/未审核；读取种子不等于确认班情。README补充API与复跑方法，不开发教育界面。
+
+### 实际验证与排错
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_education_api.py -q --tb=short --junitxml=.runtime/stage04-regression-verified.xml -o junit_family=xunit1
+.venv/bin/python scripts/verify_stage04.py <已授权SSH目标> --real-model --evidence-prefix stage04-verified
+.venv/bin/ruff check backend runner scripts/verify_stage03.py scripts/verify_stage04.py
+git diff --check
+```
+
+第一条已实际147 PASS，0失败/0跳过（8.48秒），只有既有Starlette TestClient弃用警告。真实隔离/最终模型结果待下方补记，不以先前源码证据冒充最终源码。
+
+本轮发现并修正：①原API种子测试固定期望2文件，与本阶段明确扩为7文件冲突，改为逐一校验确切7个路径，未弱化为宽松计数；②任务测试契约检查原先在逐项执行时才做，改为全课预检后才执行，Runner未配置也能先指出规格删减。中间2 FAIL/144 PASS报告保存在`.runtime/stage04-regression-before-fixes.xml`，最终没有覆盖为成功。
+
+真实模型初次（`stage04-live-model.json`，会话`4ce3fdaed8eb4aec84f5c19aa8c4fbb7`）发生一次PROVIDER_TIMEOUT，原60秒预算与未知费用预留保留，重试后工具链和5份代码通过；但内容与规则草稿完全相同，**不能作为模型自主教育内容生成的证据**。中间重复验收`stage04-final-*`也保留，仅作当时源码记录。最终探针已加强为必须改写至少两个具体课堂活动、两个示例讲解，并对实际JSON差异断言；结果另行补记。结构格式失败→修复由明确标识的ScriptedProvider单测验证（INVALID_LESSON字段位置、原参数及成功后新版本可查），不冒充真实模型格式故障。
+
+### 当前边界与手动验证
+
+尚未执行真实教师的教育审查；自动化中的accept/reject均是显式合成教师动作，只验证机制。课程AST/术语规则只能发现首版已定义风险，不能证明教案适合所有学生。普通文本解析是窄范围汇总识别，不是任意自然语言或学生源码自动诊断；未识别/冲突数据请教师核实。
+
+本轮不验收公网HTTPS、持续Runner、完整教育UI、正式创建/覆写/恢复教师文件或ZIP；这些继续归阶段05。容器共享宿主内核，Manager持Docker权限，仍需专用可信宿主；API与候选无Docker Socket/Key。服务器仅用于授权的临时隔离测试，无发布端口，结束后清理本次资源；Key留在本机。
+
+浏览器/Playwright **NOT_TESTED**：本轮纯后端且仓库禁止未经明确要求启动浏览器。后续手动：选初中/初二并导入A→确认5/3与交集未知→生成并检查45分钟/2示例/3档题→查看每份代码case输入/期望/实际与报告Hash→故意改坏一题，确认失败/旧报告过期且导出拒绝→修复重测与逐项拒绝/接受→对比B的15分钟边界环节与大学的不变量/复杂度→正式落盘留阶段05。
+
+补充实际排错：加强探针后，会话`05e5e52ecd454cb7908865f0963884de`真实出现`plan.stage`字段缺失，模型根据INVALID_LESSON字段定位改为初中并保留新提案；活动与示例讲解已有实际改写。该run因一次模型超时的未知费用/输入预留，加上同轮重复整课JSON，达到80k输入预算，正确STOPPED/BUDGET_EXCEEDED，**没有执行报告，也不记为端到端PASS**。证据`.runtime/stage04-verified-live-model.json`和FAIL汇总完整保留。
+
+据此为Agent增加教育同轮上下文归档：只折叠已完成交换，保留当前教师需求与最后成功提案的完整工具协议，提供班情Hash/事实及成功/失败call索引；所有原始消息、参数、错误与预算仍在SQLite。相同失败历史的下次输入预留从44,906降为25,773；没有调整80k输入/12k输出/12步/费用/60秒模型时限。新增单测精确检查原始历史字节不变、错误可见、班情Hash与最新协议保留。最终源码离线结果改为**148 PASS**（8.49秒），证据`.runtime/stage04-complete-regression.xml`；真实复验改用`--evidence-prefix stage04-complete`，待下方最终结果。
+
+### 最终结果（最终源码，非前次累计）
+
+- **148项后端回归（8.49秒）+37项真实容器集成（188.54秒）=185 PASS，0失败/0错误/0跳过**。ruff与`git diff --check`通过；只有既有Starlette弃用警告，未升级依赖。最终命令使用`stage04-complete`前缀，完整源码/集成测试/驱动脚本Hash已逐一与汇总核对相同。
+- 真实百炼`qwen3.8-max`会话`9b961324592840cea00e6f993ca85c1b`、run `1f498cfb76b64e809fecf8cc36896a16`：5次成功请求，4次工具调用（context→格式错误提案→修复提案→verify_lesson）。实际提案曾缺失`plan.stage`，服务422/INVALID_LESSON给出字段位置；模型修正后6个环节activity、2个示例explanation均与规则草稿不同。全部2示例+3参考解真实PASS；candidate_ready=true、teacher_review_status=PENDING、delivery_ready=false，未冒充教师审核。估算¥0.564432、未知预留0笔；之前失败探针的未知预留仍保留在同一实例账本，没有重置预算。
+- 5份真实报告：`25398062f84148a6913debdc19235554`、`f36482d527d64c29891db74f7d9f3250`、`2f1dc65270d14207a093db6e833e004f`、`eaf838aa0fc047fcb0bec632a37df465`、`9583a702f36445c091890d66f1d87c43`。代码/规格/镜像/策略Hash及逐case完整证据在最终JSON/XML。
+- 可查看：[实际模型完整记录](../.runtime/stage04-complete-live-model.json)、[单独教案草稿JSON（教师待审）](../.runtime/stage04-complete-lesson.json)、[A/B/大学真实课例对照（合成教师操作已标明）](../.runtime/stage04-complete-comparison.json)、[源码Hash/Runner与清理汇总](../.runtime/stage04-complete-summary.json)、[148项后端JUnit](../.runtime/stage04-complete-regression.xml)、[37项真实容器JUnit](../.runtime/stage04-complete-real-tests.xml)。这些为忽略的本机运行证据，不提交Git；源码中保留可复跑脚本。
+- 执行镜像`sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159`、策略Hash`403190056f014b4843a67a3a9824fbaf06666f4b683fd0317a0a1bb5b70da214`。最终孤儿回收探针PASS；脚本结束后又独立只读查询：候选/Manager容器、临时Manager镜像标签和`/tmp/yunyun-stage03-*`目录均为空。无公网端口、无远端Key、无持续服务，SSH控制连接随后关闭。
+
+本阶段无剩余业务/API验收P0。真实教师对教学文字/难度/评分的审查、教育界面、正式教师目录写入/恢复、ZIP与公网部署继续NOT_TESTED，不能由这185项或模型文字代替；下一步为阶段05。当前工作区改动未提交/推送，未修改规则文档。
+
+## 2026-10-29：阶段04专项验收 — 两班情真实生成与学段对照
+
+本轮开始时存在上阶段完整未提交改动，全部保留；不提交/推送、不改规则/.env/锁文件/生产配置，不扩展学生端、教务或其他学科。新增可复跑专项探针`scripts/accept_stage04.py`，分别为初中A、初中B、大学A调用真实百炼，再核对每份代码的冻结契约、Hash及逐case实际结果；不再把规则样例的对照称作“两班情真实模型生成”。三组都保持主题《循环结构》、45分钟、40人、已学条件语句；A为5未交/3死循环且交集未知，B为0未交/0死循环/8边界错误，大学复用A事实仅切换stage/grade。
+
+实际发现与最小修复：成功提案加规则模板的同轮历史只有22,538字节，低于24,000字节归档阈值；之后模型连接失败的保守预留导致预算提前耗尽。最终只将教育归档触发阈值改为16,000，仍保留当前教师请求与最后成功提案的完整工具协议。中间尝试移走最后协议造成模型重读/重复生成，已回退该尝试；新增/强化测试保证最新协议、原始SQLite历史、错误索引与完整产物都保留。没有提高80k输入、12k输出、12步、模型60秒或任何代码用例/限额。
+
+本机直连官方模型接口发生连续PROVIDER_UNAVAILABLE/超时，所有未知费用预留仍在原SQLite；未切Mock。用同上下文、16-token上限的诊断请求得到真实qwen3.8-max HTTP200/length，明确只作网络诊断且没有执行工具；不能据此判教案通过。最终专项探针使用现有SSH服务器仅转发官方HTTPS的TLS字节，本机httpx保留官方SNI/证书校验和API Key，服务器未收到Key文件或明文HTTP。该路径只在验收脚本显式传YUNYUN_ACCEPT_MODEL_SOCKET时启用，没有修改产品Provider默认配置。后续部署仍需验证直连模型链路的稳定性。
+
+实际命令：
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_education_api.py -q --tb=short --junitxml=.runtime/stage04-acceptance-pass-backend.xml -o junit_family=xunit1
+# SSH控制连接复用已有授权；下例socket为本轮临时路径，API Key不传服务器
+ssh -S .runtime/ssh_control -N -L <本机临时model.sock>:dashscope.aliyuncs.com:443 <已授权SSH目标>
+YUNYUN_ACCEPT_MODEL_SOCKET=<本机临时model.sock> .venv/bin/python scripts/accept_stage04.py <已授权SSH目标> --real-model --evidence-prefix stage04-acceptance-pass
+.venv/bin/ruff check backend/app/agent.py backend/tests/unit/test_education.py scripts/verify_stage03.py scripts/accept_stage04.py
+git diff --check
+```
+
+后端回归已149 PASS（8.51秒，既有Starlette弃用警告1条）；最终真实模型/Runner与具体差异结果见随后补记。脚本另支持`--model-only`仅重跑模型，相关汇总会明确pytest=NOT_TESTED，不复用成“本次已重跑”。`stage04-acceptance-*`、`stage04-acceptance-final-*`、`stage04-acceptance-retry-*`、`stage04-acceptance-tls-*`失败记录保留，均不充当最终源码PASS证据。
+
+### 专项验收最终结果与文案审校
+
+最终分别用真实qwen3.8-max生成初中A、初中B、大学A三套结构化教案（两班除观察数据外保持40人、已学条件语句、主题/课时/模型相同）。三套原始生成均走`get_education_context → propose_lesson → verify_lesson`并COMPLETED，15份代码/51条冻结用例真实通过，估算¥1.409208；这次真实生成证据是`.runtime/stage04-acceptance-final2-live-model.json`，不是旧规则样例或Mock。
+
+**代码通过后继续读文字，仍发现了真实AI错误。** 例如把Python `for/range`写成`i`自动变为`n+1`再判断退出，大学参考说明把n=0时递减量写为-1，以及把素数计数的保守上界当作所有候选都会取满的实际次数。这些错误不能由stdout用例自动发现。最终通过现有`EducationService.revise`逐项修订：保留for迭代器耗尽与while条件判断的区别，补齐不变量初始化/保持/退出、终止性及准确复杂度说明；保持代码、冻结规格、评分点和时间不变。原模型稿与每项before/after、parent/revision均保存。修订由自动验收执行，**不是教师正式审批，也不冒称模型首次生成已正确**。
+
+本轮源码最小修复还包括：将旧逐文件验证指令限定为独立草稿，完整教案明确使用批量verify_lesson；0人未交不再创建补交环节；大学参考解缺乏实际论证时阻断候选；Markdown导出不再丢掉练习的参考解说明。对应文件为`agent.py/tools.py`、`education/rules.py/render.py`、大学结构种子及相关测试。新增`accept_stage04.py/recheck_stage04.py`保留可复跑过程；没有改冻结输入/期望或执行限额。
+
+最终文本版本与实际差异：
+
+| 维度 | 初中A | 初中B | 大学A |
+|---|---|---|---|
+| 学情 | 5未交、3死循环；交集未知 | 0未交、0死循环、8边界错误 | 同A，仅切换大学/大一 |
+| 六环节分钟 | 5/8/10/10/10/2=45 | 2/8/8/15/10/2=45 | 5/8/10/10/10/2=45 |
+| 课堂示例 | count、while sum | count、for even_sum | sum不变量、pairs嵌套计数 |
+| 三档题 | countdown/even_sum/multiples | 同三题，改用边界支架与评分重心 | sum/divisors/primes |
+| 评分 | 25初值条件/35更新结果/20边界/20追踪表 | 25初值条件/35更新结果/40边界 | 50程序/30不变量及终止证明/20复杂度 |
+| 最终教案revision | 2 | 5 | 7 |
+| 最新真实执行 | 5程序17用例PASS | 5程序18用例PASS | 5程序16用例PASS |
+
+最终使用新的临时隔离器再次执行**全部15份代码/51条用例**，不是沿用旧报告；新报告ID与原报告ID不重合，代码Hash与原生成稿相等，冻结规格ID/Hash及断言不变。原报告仍作为历史保留。A的不同学生人数保持未知，不能把5+3直接计作8；B的8只对应有来源的边界错误观察。预警的evidence_ids可回溯到相应事实、count与原JSON位置/Hash；cause_status始终hypothesis，缺少证据的类型明确predicted。
+
+实际结果：**151项后端回归PASS（8.59秒）+8项真实教育集成PASS（102.64秒）**，0失败/0错误/0跳过；另有三次真实生成及最终独立重跑的15份代码/51用例PASS，不把用例数累计成pytest数量。ruff/git diff --check通过。最终审校快照的teacher_review_status仍PENDING、delivery_ready=false；本次自动审校不代替真实教师判断。
+
+最终复验命令（源码中脚本可复跑；先生成新会话，再以该生成文件作为source，拒绝覆盖已有后续修订）：
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_education_api.py -q --tb=short --junitxml=.runtime/stage04-acceptance-final2-backend.xml -o junit_family=xunit1
+YUNYUN_ACCEPT_MODEL_SOCKET=<本机临时model.sock> .venv/bin/python scripts/accept_stage04.py <已授权SSH目标> --real-model --evidence-prefix stage04-acceptance-final2
+YUNYUN_ACCEPT_SOURCE=.runtime/stage04-acceptance-final2-live-model.json .venv/bin/python scripts/recheck_stage04.py <已授权SSH目标> --recheck-artifacts --model-only --evidence-prefix stage04-acceptance-corrected
+.venv/bin/ruff check backend runner scripts/accept_stage04.py scripts/recheck_stage04.py scripts/verify_stage03.py scripts/verify_stage04.py
+git diff --check
+```
+
+最后一条脚本在本次**不调用模型**，`model_called=false`；它修订已生成产物并真实重跑代码，pytest明确NOT_TESTED，回归结果来自前两条的独立JUnit，不能假称重跑了回归。最终业务源码/测试/驱动Hash、修订脚本Hash与来源生成文件Hash均已核对。
+
+证据：[真实生成完整记录](../.runtime/stage04-acceptance-final2-live-model.json)、[最终A/B/大学结构化差异与参考说明](../.runtime/stage04-acceptance-corrected-artifact-recheck-comparison.json)、[逐项before/after、父版本与最新执行报告](../.runtime/stage04-acceptance-corrected-artifact-recheck.json)、[A教案](../.runtime/stage04-acceptance-corrected-artifact-recheck-junior_A-lesson.json)、[B教案](../.runtime/stage04-acceptance-corrected-artifact-recheck-junior_B-lesson.json)、[大学教案](../.runtime/stage04-acceptance-corrected-artifact-recheck-university_A-lesson.json)、[151项JUnit](../.runtime/stage04-acceptance-final2-backend.xml)、[8项真实集成JUnit](../.runtime/stage04-acceptance-final2-real-tests.xml)、[最终来源Hash与清理汇总](../.runtime/stage04-acceptance-corrected-summary.json)。全部为忽略的本机运行证据，未提交Git。
+
+实际输出摘要（均exit_code=0）：A sum输入5→stdout `15\n`；A count输入0→stdout空串；B even_sum输入6→`12\n`；大学pairs输入4→`10\n`、divisors输入12→`6\n`、primes输入10→`4\n`。逐case的stdin/expected/actual/stdout/stderr/耗时/退出码及代码/规格/运行时/策略Hash均在上述报告。执行镜像仍为`sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159`。
+
+最终独立查询确认候选/Manager容器、临时Manager镜像标签及远端源码目录为空，无公网端口。只剩本机运行证据与原费用账簿；本轮没有提交/推送，没有正式覆盖教师文件。真实教师审核、浏览器/Playwright、教育UI、正式发布/ZIP仍NOT_TESTED；本轮未修改前端且未获浏览器验收请求。直连模型长响应仍有网络稳定性风险，最终真实生成通过明示的端到端TLS转发完成，产品默认Provider未被替换。
