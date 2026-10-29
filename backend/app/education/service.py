@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 
 from pydantic import ValidationError
@@ -25,7 +26,7 @@ class EducationService:
             raise AppError('PROFILE_REQUIRED', '请先导入当前会话的汇总班情。', 409)
         return ClassProfile.model_validate(matches[-1])
 
-    def import_profile(self, session, content, format):
+    def import_profile(self, session, content, format, *, source: bytes | None = None):
         previous = self.profiles(session['id'])
         last = previous[-1]['profile'] if previous else None
         context = session['context']
@@ -36,6 +37,8 @@ class EducationService:
                                     last['revision'] + 1 if last else 1, last['id'] if last else None)
         except ValidationError:
             raise AppError('INVALID_CLASS_DATA', '班情字段不符合结构协议。', 422) from None
+        if source is not None:
+            profile.source_hash = hashlib.sha256(source).hexdigest()
         self.store.put('class_profiles', {'id': uid(), 'session_id': session['id'],
                                          'profile': profile.model_dump()})
         self.store.event(session['id'], None, 'class_profile.imported',
@@ -148,6 +151,10 @@ class EducationService:
                   'item_revisions': item_revisions, 'content_hash': sha(dumps(plan.model_dump())),
                   'created_at': now(), 'reason': reason, 'run_id': run_id,
                   'source': 'model' if run_id else 'teacher', 'mock': session['mock']}
+        for approval in self.store.find('approvals', sid):
+            if approval.get('lesson_id') == lesson_id and approval['status'] == 'PENDING':
+                approval['status'] = 'STALE'
+                self.store.put('approvals', approval)
         self.store.put('lessons', record)
         self.store.event(sid, run_id, 'lesson.revised', {'lesson_id': lesson_id, 'revision': record['revision'],
                                                       'content_hash': record['content_hash']})
@@ -237,7 +244,7 @@ class EducationService:
                 'teacher_review_status': 'ACCEPTED' if accepted else 'PENDING',
                 'candidate_ready': verified and not risks and not stale,
                 'delivery_ready': verified and accepted and not risks and not stale,
-                'notice': '代码通过仅覆盖固定用例；教案文字、学段适配、超纲与评分仍须教师逐项确认。正式落盘由阶段05处理。'}
+                'notice': '代码通过仅覆盖固定用例；教案文字、学段适配、超纲与评分仍须教师逐项确认。正式写入前还须确认文件Diff。'}
 
     async def verify(self, sid, lesson_id, revision):
         record = self.latest(sid, lesson_id)

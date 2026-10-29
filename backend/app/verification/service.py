@@ -57,8 +57,15 @@ class VerificationService:
                 draft['status'] = 'DRAFT'
                 self.store.put('drafts', draft)
         for approval in self.store.find('approvals', sid):
-            draft = self.store.get('drafts', approval['draft_id'])
-            if draft['path'] == path and approval['status'] == 'PENDING':
+            if approval['status'] != 'PENDING':
+                continue
+            did = approval.get('draft_id')
+            affected = bool(did and self.store.get('drafts', did)['path'] == path)
+            if approval.get('lesson_id'):
+                affected |= any(r['lesson_id'] == approval['lesson_id'] and
+                                any(self.store.get('drafts', d)['path'] == path for d in r['bindings'].values())
+                                for r in self.store.find('lessons', sid))
+            if affected:
                 approval['status'] = 'STALE'
                 self.store.put('approvals', approval)
 
@@ -113,10 +120,10 @@ class VerificationService:
 
     def delivery_candidates(self, sid):
         latest = {d['path']: d for d in self.store.find('drafts', sid) if is_python_path(d['path'])}
-        if not latest or any(d['operation'] != 'write' or not self.current_pass(d)
-                             for d in latest.values()):
+        if not latest or any(not self.current_pass(d)
+                             for d in latest.values() if d['operation'] == 'write'):
             raise AppError('VERIFICATION_REQUIRED', '存在失败、过期或漏测代码，不能进入可交付候选。', 409)
-        return list(latest.values())
+        return [d for d in latest.values() if d['operation'] == 'write']
 
     async def prepare(self, sid, did, spec_id):
         identity = await self.runner.identity()

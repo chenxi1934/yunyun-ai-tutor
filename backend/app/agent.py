@@ -4,6 +4,7 @@ import shutil
 import time
 
 from app.config import PROJECT_ROOT, Settings
+from app.delivery import DeliveryService
 from app.domain import AppError, dumps, now, sha, uid
 from app.education.service import EducationService
 from app.providers import Provider, create_provider
@@ -26,7 +27,7 @@ SYSTEM = """你是耘耘AI助教，面向教师。使用简体中文。
 结构化教案必须调用verify_lesson，一次真实验证全部示例与三档参考解；不要改走逐文件验证。
 教案代码失败用revise_lesson_item修订单项后再次verify_lesson，不改测试；全文用read_lesson取回。
 错因区分观察与预测，原因始终为假设；初中/大学深度分别遵循课程约束。
-通过只表示固定用例通过；教案文字、评分、超纲与适配仍须教师逐项审核，不能自报接受。正式发布尚未开放。
+通过只表示固定用例通过；教案文字、评分、超纲与适配仍须教师逐项审核，不能自报接受。正式文件写入必须等待教师在界面确认具体Diff。
 按实际需求选择工具；遇到错误可修正参数，不能绕过权限。最终以面向教师的消息结束。
 """
 ACTIVE = {"READY", "RUNNING", "WAITING_APPROVAL", "INTERRUPTED"}
@@ -39,7 +40,8 @@ class Agent:
         self.verification = VerificationService(store, RemoteRunner(
             settings.runner_socket, settings.runner_token.get_secret_value()))
         self.education = EducationService(store, self.verification)
-        self.registry = Registry(store, self.verification, self.education)
+        self.delivery = DeliveryService(self)
+        self.registry = Registry(store, self.verification, self.education, self.delivery)
 
     def create_session(self, owner: str, context: dict) -> dict:
         sid, wid = uid(), uid()
@@ -119,6 +121,7 @@ class Agent:
             session = self.store.get("sessions", sid)
             if session["revision"] != revision:
                 raise AppError("REVISION_CONFLICT", "会话已更新，请刷新后重试。", 409)
+            self.delivery.ensure_reconciled(session)
             runs = self.store.find("runs", sid)
             if not runs or runs[-1]["status"] not in {"INTERRUPTED", "FAILED"}:
                 raise AppError("NOT_RESUMABLE", "当前任务不需要恢复。", 409)
@@ -144,29 +147,7 @@ class Agent:
                          {"call_id": call["id"], "name": call["name"], "result": result})
 
     def reject(self, approval_id: str, revision: int, approve: bool = False):
-        with self.store.tx():
-            approval = self.store.get("approvals", approval_id)
-            sid = approval["session_id"]
-            session = self.store.get("sessions", sid)
-            if session["revision"] != revision:
-                raise AppError("REVISION_CONFLICT", "会话已更新，请刷新后重试。", 409)
-            if approval["status"] != "PENDING":
-                raise AppError("APPROVAL_DECIDED", "该请求已经处理。", 409)
-            if approve:
-                raise AppError("PUBLISH_NOT_READY", "正式提交将在阶段05开放；测试通过仍不能自动批准写入。", 409)
-            approval["status"] = "REJECTED"
-            self.store.put("approvals", approval)
-            call = self.store.get("calls", approval["call_id"])
-            self._finish_call(call, {"call_id": call["id"], "ok": False, "data": None,
-                                    "error": {"code": "APPROVAL_DENIED", "message": "教师拒绝正式变更。",
-                                              "retryable": False}})
-            run = self.store.get("runs", approval["run_id"])
-            run["status"] = "INTERRUPTED"
-            self.store.put("runs", run)
-            session["revision"] += 1
-            self.store.put("sessions", session)
-            self.store.event(sid, run["id"], "approval.decided", {"approval_id": approval_id,
-                             "status": "REJECTED", "formal_file_changed": False})
+        return self.delivery.decide(approval_id, revision, approve)
 
     def stop(self, rid: str, status: str, error: dict):
         with self.store.tx():
@@ -398,8 +379,8 @@ class Agent:
                         delivery_status = "DRAFT_ONLY"
                         if any(is_python_path(d["path"]) for d in self.store.find("drafts", sid)):
                             try:
-                                self.verification.delivery_candidates(sid)
-                                delivery_status = "READY_FOR_TEACHER_REVIEW"
+                                candidates = self.verification.delivery_candidates(sid)
+                                delivery_status = "READY_FOR_TEACHER_REVIEW" if candidates else "NO_CODE_TO_VERIFY"
                             except AppError:
                                 delivery_status = "VERIFICATION_FAILED"
                         lessons = self.store.find('lessons', sid)

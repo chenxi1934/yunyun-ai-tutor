@@ -1,6 +1,6 @@
 # P0 与交付验收矩阵
 
-**修订日期：2026-10-29。阶段03验证闭环已实现；首次执行证据见第9节，对抗性复验见第10节，当前P1修复见第11节。原题完整教育/发布能力未覆盖部分继续为 NOT_TESTED。**
+**修订日期：2026-10-30。阶段05双端功能、公网HTTPS、真实交付与Chrome/WebKit验收见第14节；人工教育审查和最终面试交付仍有未验项目。**
 
 架构、协议、阶段和部署闸口见 [PLAN.md](PLAN.md)，实际执行记录见 [PROGRESS.md](PROGRESS.md)。历史文档/环境检查不能充当产品能力证据；各阶段证据仅适用于其记录的源码与范围。
 
@@ -19,26 +19,26 @@
 
 | ID | 原题锚点/要求 | 可观察的 PASS 标准 | 方法 | 状态 | 实际证据 |
 |---|---|---|---|---|---|
-| A1 | A1，自然语言工作区读写与可感知变更 | 一句话使真实模型返回原生 tool_calls，实际 list/read；读到随机文件内容后据此提出草稿；界面有真实新文件/diff，可续改，正式文件未经确认不变 | Provider 探针、F21、M-PC、M-WEB | NOT_TESTED | 阶段02 PC/Web真实API子链路PASS；草稿/diff已保存，浏览器呈现与完整审批待阶段05 |
+| A1 | A1，自然语言工作区读写与可感知变更 | 一句话使真实模型返回原生 tool_calls，实际 list/read；读到随机文件内容后据此提出草稿；界面有真实新文件/diff，可续改，正式文件未经确认不变 | Provider 探针、F21、M-PC、M-WEB | PASS | 阶段02真实工具往返；阶段05 Chrome双端真实模型、工作区草稿/Diff/修改与正式审批，见第14节 |
 | A2 | A2，真实代码运行 | 候选 Python 确实执行；stdout/stderr/exit_code/耗时与实际一致；错误代码/异常/死循环明确失败并定位，非候选自报 PASS | F01–F06；Runner 集成测试 | PASS | 阶段03：PC共享核心真实容器回归19 PASS；Web真实百炼错误报告→修复→同规格重测通过；逐用例stdout/stderr/退出码/耗时/证据见第9节 |
-| A3 | A3，多轮与会话恢复 | 第二轮能引用上一轮班情/修改；关闭后端再启动可恢复消息、草稿、工具结果、冻结用例、报告、待审批与预算；不会重复写/删 | F09、F11、F17；恢复集成测试 | NOT_TESTED | 阶段02实际进程重启恢复消息/草稿/工具/审批/预算PASS；阶段03规格/报告入SQLite，修复额度重开存储保持；正式提交及全链路进程恢复仍待验收 |
-| A4 | A4，至少一个真实 API；允许 Mock 兜底 | 一家实际账户 API 完成“模型 call → 工具真执行 → call_id 回传 → 模型使用结果”；留脱敏请求/响应、实际 model/usage；Mock 时界面/事件/导出均醒目标识 | Provider 探针、F16、F21 | NOT_TESTED | 真实百炼qwen3.8-max原生工具往返及两轮上下文PASS，PC/Web均有证据；Mock事件/API标识已测、UI已构建，浏览器与导出标识尚未验收，故整项不提前PASS |
-| A5 | A5，明确权限分级 | 授权读/草稿/受限测试可按 Policy 执行；正式创建/覆盖/删除展示具体 diff 并需教师确认；模型和直接 API 均不能伪造批准，路径越界被拒 | F10、F12–F15；Policy/提交测试 | NOT_TESTED | 读/草稿/路径拒绝/待审批/拒绝恢复子项PASS；阶段03受限执行已验证；正式提交待阶段05 |
-| B1 | B1，结构化可复用备课产出 | Pydantic 校验 JSON；有稳定 ID 的目标/环节/时间，合计 45 分钟；2–3 个示例；基础/进阶/挑战各 1 题，均含参考解、用例与合计 100 的评分点；JSON/Markdown 导出一致 | 教育单测、M-PC、M-WEB、F20 | PASS（业务/API） | 阶段04严格结构、45分钟、2示例/三档题/评分点、JSON/Markdown/代码组合一致；见第12节。教育UI与正式提交留阶段05 |
-| B2 | B2，所有代码真正通过用例才可交付 | manifest 的每个示例和参考解均有当前指纹下的完整成功报告，逐 case 输入/预期/实际可查；任一错误或漏测阻断交付；模型至多修复两次且不改保护用例 | F01–F08、F20；真实完整教案生成 | NOT_TESTED | 阶段04完整5份代码、真实失败/修复/过期/冻结规格与manifest闸口PASS；正式教师教育审核和发布仍待阶段05/人工，见第12节 |
-| B3 | B1/B2，逐项接受/拒绝/继续编辑与回退 | 教案段落、示例、题目有独立 revision/审批；拒绝后正式文件字节不变并可恢复候选父版本；已发布版本可转成恢复草稿，重测/审批后回写；代码编辑立即使旧验证过期 | F07、F10、F11、F13、F23 | NOT_TESTED | 阶段04逐项接受/拒绝、独立修订、父版本/恢复草稿与代码失效PASS；已发布版本恢复/正式回写待阶段05 |
-| B4 | B3，错因预警贴合班情 | 每条有 misconception_type、evidence/未知项、trigger、cause、teaching_intervention、exercise_ids 与学段；“死循环 3 人”推动具体追踪干预；无证据结论标预测，不能泛化为能力差 | F18、F19；策略单测及教师内容审查 | NOT_TESTED | 阶段04依据链、观察/预测/病因假设及班情干预的结构/规则PASS；真实教师内容审查尚未执行，见第12节 |
-| B5 | B4，初中/大学学段实质适配 | 固定主题与班情切换学段，至少目标、示例/练习、评分点三处实质变化；初中先修/超纲规则生效，大学增加推理/复杂度；两端均可配置 | F19；对照 JSON 与教师审查 | NOT_TESTED | 阶段04两学段目标/嵌套任务/评分差异、初中课程风险及两学段全部代码真实验证PASS；双端UI与真实教师适配审查待后续 |
-| B6 | B4，粘贴/上传班情驱动备课 | 支持粘贴文本与 JSON/CSV 上传；A/B 两份数据同题生成不同分钟分配和至少一项示例/练习策略；5 人未交与 3 人死循环不合计为 8 人，来源/分母/交集可追踪，缺失/冲突不默补 | F18、F19；导入/策略测试 | PASS（API） | 阶段04文本/JSON/CSV导入、来源/未知/冲突处理、A/B时间/示例/评分差异均PASS；教育表单留阶段05，见第12节 |
-| C1 | C，本机可运行与启动交付 | 在指定 macOS 现场机器按 README 安装前提后，一条启动命令可打开 GUI、访问本机 API；明确 Python 3.12，不能误用系统 3.9；冷启动可复现 | M-PC 第 1 步；现场启动记录 | NOT_TESTED | 无；仅解释器存在 |
-| C2 | C，真实本地目录与落盘 | 教师打开仓库外临时真实目录；可读原文件、创建新文件、批准修改后字节真实变化；记录前后 hash 与实际路径；拒绝无落盘 | M-PC、F10、F12、F13 | NOT_TESTED | 无 |
-| C3 | C，执行命令/覆盖前的分级权限 | 受限容器测试按 L2；PC 有限防护模式必须对本次 hash 与风险确认；未批准的正式写/删与任意 shell 均被后端拒绝；不把 subprocess 宣称强隔离 | F10、F12、F14；PC 权限操作记录 | NOT_TESTED | 无 |
-| C4 | C，教师视角完整 B1–B4 | 在真实本地工作区完成结构产出、所有代码真实验证、逐项回退、班情错因和学段适配；不是只运行一个玩具示例 | M-PC，B1–B6 的 PC 证据 | NOT_TESTED | 无 |
-| D1 | D/交付1，直接打开的公网 URL | 实际 HTTPS URL 从开发机之外的网络/新浏览器可打开；能使用 API/SSE 完成主链路；记录地址、访问时间与实际结果 | M-WEB；外部访问记录 | NOT_TESTED | 阶段02已在VPS临时容器实际构建/启动/恢复，结束清理；未发布端口、未提供公网HTTPS URL |
+| A3 | A3，多轮与会话恢复 | 第二轮能引用上一轮班情/修改；关闭后端再启动可恢复消息、草稿、工具结果、冻结用例、报告、待审批与预算；不会重复写/删 | F09、F11、F17；恢复集成测试 | PASS | 阶段02多轮；阶段05 Chrome PC待审/已提交两次进程重启、刷新与恢复；提交后崩溃工具回填不重写，见第14节 |
+| A4 | A4，至少一个真实 API；允许 Mock 兜底 | 一家实际账户 API 完成“模型 call → 工具真执行 → call_id 回传 → 模型使用结果”；留脱敏请求/响应、实际 model/usage；Mock 时界面/事件/导出均醒目标识 | Provider 探针、F16、F21 | PASS | 百炼qwen3.8-max真实原生工具与usage；阶段05双端真实模型及Chrome/WebKit；显式Mock与导出mock元数据沿用协议 |
+| A5 | A5，明确权限分级 | 授权读/草稿/受限测试可按 Policy 执行；正式创建/覆盖/删除展示具体 diff 并需教师确认；模型和直接 API 均不能伪造批准，路径越界被拒 | F10、F12–F15；Policy/提交测试 | PASS | 阶段05 Hash绑定正式创建/覆盖/删除/拒绝/恢复与权限测试；代码验证/教师审核/提交独立，见第14节 |
+| B1 | B1，结构化可复用备课产出 | Pydantic 校验 JSON；有稳定 ID 的目标/环节/时间，合计 45 分钟；2–3 个示例；基础/进阶/挑战各 1 题，均含参考解、用例与合计 100 的评分点；JSON/Markdown 导出一致 | 教育单测、M-PC、M-WEB、F20 | PASS | 阶段04教育协议；阶段05双端结构界面与正式ZIP，2示例/三档题/评分/时间和Hash一致，见第14节 |
+| B2 | B2，所有代码真正通过用例才可交付 | manifest 的每个示例和参考解均有当前指纹下的完整成功报告，逐 case 输入/预期/实际可查；任一错误或漏测阻断交付；模型至多修复两次且不改保护用例 | F01–F08、F20；真实完整教案生成 | PASS（技术交付闸口） | 阶段05所有示例/参考解当前真实报告、失败/过期/未审阻断提交与ZIP；人工教育判断另列NOT_TESTED |
+| B3 | B1/B2，逐项接受/拒绝/继续编辑与回退 | 教案段落、示例、题目有独立 revision/审批；拒绝后正式文件字节不变并可恢复候选父版本；已发布版本可转成恢复草稿，重测/审批后回写；代码编辑立即使旧验证过期 | F07、F10、F11、F13、F23 | PASS | 阶段04逐项父版本与重新验证；阶段05实际覆盖/删除/拒绝/恢复Diff/崩溃窗口；代码变化使报告与待审批包失效，见第14节 |
+| B4 | B3，错因预警贴合班情 | 每条有 misconception_type、evidence/未知项、trigger、cause、teaching_intervention、exercise_ids 与学段；“死循环 3 人”推动具体追踪干预；无证据结论标预测，不能泛化为能力差 | F18、F19；策略单测及教师内容审查 | NOT_TESTED（人工审查） | 依据链与双端错因展示/代码技术验收PASS；真实教师内容审查尚未执行，不用自动化点击替代 |
+| B5 | B4，初中/大学学段实质适配 | 固定主题与班情切换学段，至少目标、示例/练习、评分点三处实质变化；初中先修/超纲规则生效，大学增加推理/复杂度；两端均可配置 | F19；对照 JSON 与教师审查 | NOT_TESTED（人工审查） | 阶段05初中A/B与大学真实程序/评分/目标差异、共享双端配置已测；真实教师适配审查仍待完成 |
+| B6 | B4，粘贴/上传班情驱动备课 | 支持粘贴文本与 JSON/CSV 上传；A/B 两份数据同题生成不同分钟分配和至少一项示例/练习策略；5 人未交与 3 人死循环不合计为 8 人，来源/分母/交集可追踪，缺失/冲突不默补 | F18、F19；导入/策略测试 | PASS（API/流程） | 阶段04上传解析/规则对照；阶段05浏览器A/B选择与真实班情导入、结构化主线；大文件原文上传协议见API测试 |
+| C1 | C，本机可运行与启动交付 | 在指定 macOS 现场机器按 README 安装前提后，一条启动命令可打开 GUI、访问本机 API；明确 Python 3.12，不能误用系统 3.9；冷启动可复现 | M-PC 第 1 步；现场启动记录 | PASS（当前macOS） | 一键入口实际启动并自动开GUI；CLI选仓库外目录、Python3.12、私有Runner；面试现场机器另待验收 |
+| C2 | C，真实本地目录与落盘 | 教师打开仓库外临时真实目录；可读原文件、创建新文件、批准修改后字节真实变化；记录前后 hash 与实际路径；拒绝无落盘 | M-PC、F10、F12、F13 | PASS | 阶段05真实文件覆盖/删除/恢复与CRLF字节断言；Chrome PC模型备课包实际落盘，见第14节 |
+| C3 | C，执行命令/覆盖前的分级权限 | 受限容器测试按 L2；PC 有限防护模式必须对本次 hash 与风险确认；未批准的正式写/删与任意 shell 均被后端拒绝；不把 subprocess 宣称强隔离 | F10、F12、F14；PC 权限操作记录 | PASS | 本机能力口令、Hash/Diff确认、拒绝不写入、私有隔离Runner；没有宿主子进程降级与任意shell |
+| C4 | C，教师视角完整 B1–B4 | 在真实本地工作区完成结构产出、所有代码真实验证、逐项回退、班情错因和学段适配；不是只运行一个玩具示例 | M-PC，B1–B6 的 PC 证据 | PASS（技术流程） | PC真实模型整课、逐项审核、真实执行与正式包；两学段/班情共享核心真实容器测试；人工教学判断待教师 |
+| D1 | D/交付1，直接打开的公网 URL | 实际 HTTPS URL 从开发机之外的网络/新浏览器可打开；能使用 API/SSE 完成主链路；记录地址、访问时间与实际结果 | M-WEB；外部访问记录 | PASS | https://111.229.226.186；开发机外VPS的真实HTTPS，Chrome/WebKit新上下文端到端；第三条独立网络未验 |
 | D2 | D，5–15 个种子文件 | 新会话实际列出 5–15 个可读文件，含教案、练习、示例和两份班情；不同会话独立可写，不修改种子或其他会话 | 文件清单与 F14；拟定 10 文件种子 | PASS | 阶段04新Web工作区精确7个合成文件，含两班情与初中/大学结构种子；独立会话沿用既有隔离协议，见第12节 |
-| D3 | D，真实验证与可看/下载教案包 | 一句话备课到真实 Python 失败/修复/通过可查，再经教师审核导出 ZIP；解包有教案 JSON/Markdown、示例、三档题/参考解/评分点、测试、报告、manifest；hash 对得上 | M-WEB、F02、F05、F20 | NOT_TESTED | 无 |
-| D4 | D，Web 全部教育能力与安全边界 | B1–B6 在 Web 均有证据；执行走独立 Runner，网络/资源/文件限制实际生效；公网 API/代码容器无 Docker Socket/宿主目录权限；隔离不可用明确关闭执行 | F05、F06、F12、F14，B1–B6 的 Web 证据 | NOT_TESTED | 无 |
-| E1 | 交付4，源码历史与关键 prompt | 源码完整可复现，有解释阶段问题的有意义 Git 提交，关键 prompt 与至少一例真实纠错可查；无 Key/真实学生信息入库。提交/推送需另有授权 | 授权后的 git log/源码检查；prompts 与 AI_DEV_LOG | NOT_TESTED | 无；当前无业务源码 |
+| D3 | D，真实验证与可看/下载教案包 | 一句话备课到真实 Python 失败/修复/通过可查，再经教师审核导出 ZIP；解包有教案 JSON/Markdown、示例、三档题/参考解/评分点、测试、报告、manifest；hash 对得上 | M-WEB、F02、F05、F20 | PASS | Chrome故意失败/修复；Chrome和WebKit真实模型、逐项审核、正式提交与ZIP解包Hash/报告验证，见第14节 |
+| D4 | D，Web 全部教育能力与安全边界 | B1–B6 在 Web 均有证据；执行走独立 Runner，网络/资源/文件限制实际生效；公网 API/代码容器无 Docker Socket/宿主目录权限；隔离不可用明确关闭执行 | F05、F06、F12、F14，B1–B6 的 Web 证据 | PASS（技术边界） | 独立Manager/候选隔离沿用阶段03证据；阶段05持续部署API无Docker Socket、真实教育主线与cookie隔离；人工教学判断待教师 |
+| E1 | 交付4，源码历史与关键 prompt | 源码完整可复现，有解释阶段问题的有意义 Git 提交，关键 prompt 与至少一例真实纠错可查；无 Key/真实学生信息入库。提交/推送需另有授权 | 授权后的 git log/源码检查；prompts 与 AI_DEV_LOG | NOT_TESTED（最终交付） | 源码/关键prompt和阶段实现保留；本轮未获Git提交/推送授权，完整最终交付与历史汇总留阶段06 |
 | E2 | 交付3，≤5 分钟演示视频 | 可播放实际视频且时长≤300 秒，连续展示需求、结构化产出、真实故意失败及修复/阻断、当前报告、审核、本机正式落盘、班情错因；不是截图拼出假 PASS | 计时视频/链接与 DEMO_SCRIPT 对照 | NOT_TESTED | 无 |
 | E3 | 交付5，一页设计与教育判断 | 一页回答错误阻断/验证/留痕/确认边界、裁剪理由、关键 prompt 和至少一例实际 AI 错误/发现/修正、学生端防抄设计、真实班级首轮隐私/内容安全；引用/改写开源时写清出处和范围；简述产品交互/视觉与可靠性优先 | DESIGN_DECISIONS/AI_DEV_LOG 与真实日志对照 | NOT_TESTED | 无；本轮仅新增产品交互说明，其他章节待真实实现后填写 |
 | E4 | 现场，换请求仍运行，PC 可启动 | 在现场机器冷启动，用未硬编码的新备课表达完成真实工具/验证/审核链路；解释可验证与需教师判断部分，模型/网络失败时如实展示 | F22、M-PC、真实 API 与现场记录 | NOT_TESTED | 无 |
@@ -74,9 +74,9 @@
 | F22 | 使用与演示不同的新表达，改变练习侧重或班情数字，仍经过实际工具而非关键词固定脚本，结果可解释且可追溯 | 真实模型现场验收 | NOT_TESTED | 无 |
 | F23 | 候选被拒可回到父候选；已发布旧版经新恢复草稿、代码重测与新审批后恢复，当前正式文件在确认前不变，历史记录不消失 | 版本/提交集成 | NOT_TESTED | 无 |
 
-## 4. 双端手动验收流程（本轮未执行）
+## 4. 双端手动验收流程（保留供教师/现场验收）
 
-默认不启动服务和浏览器。以下可由用户手动执行；若后续明确授权浏览器验证，再实现/运行相关 Playwright。先完成 README 安装前提和安全配置，不把下列尚不存在的脚本当成本轮可运行成果。
+阶段05已按用户授权运行对应自动化主线，证据见第14节。以下流程仍供真实教师与现场机器复验；自动化合成审核不能替代人工教学判断。
 
 ### M-PC：真实目录闭环
 
@@ -97,7 +97,7 @@
 
 ## 5. 当前结论
 
-阶段03当前P1修复验证见第11节，对抗性验收见第10节，首次实施结果见第9节，阶段02历史结果见第6–8节。原题A2真实代码运行已PASS；完整教育结构、发布/导出、公网URL与浏览器交互仍未覆盖。故障F04和F21已有对应证据，其余故障按完整标准保留NOT_TESTED；第9节明确列出本轮实际覆盖，不能将部分覆盖冒充完整产品验收。具体命令、故障排查、用量与证据位置见 [PROGRESS.md](PROGRESS.md)。
+阶段05共享PC/Web完整功能、公网HTTPS、正式文件审批/提交/恢复和ZIP已实现，Chrome双端及WebKit公网主线通过。156项后端回归和5项真实容器交付通过。人工教育审查、Firefox兼容、原生选目录弹窗、未来证书续期及阶段06现场/视频尚未通过或未执行；详见第14节。阶段02–04历史记录继续保留其原有范围与限制。
 
 ## 6. 阶段02实施时子验收（2026-10-29，历史记录）
 
@@ -295,3 +295,108 @@
 可核查：[最终结构化差异](../.runtime/stage04-acceptance-corrected-artifact-recheck-comparison.json)、[完整修订与新执行证据](../.runtime/stage04-acceptance-corrected-artifact-recheck.json)、[三套原始真实模型记录](../.runtime/stage04-acceptance-final2-live-model.json)、[151项后端JUnit](../.runtime/stage04-acceptance-final2-backend.xml)、[8项真实Runner集成JUnit](../.runtime/stage04-acceptance-final2-real-tests.xml)、[来源Hash与清理汇总](../.runtime/stage04-acceptance-corrected-summary.json)。完整命令、每套教案JSON及已知网络限制见PROGRESS专项验收末节。
 
 浏览器/Playwright、真实教师最终教育审核、公网/持续Runner/正式发布/ZIP仍NOT_TESTED。临时容器/镜像标签/远端源码已独立确认清理；模型长响应直连不稳定，本轮明示采用本机证书校验的SSH TLS字节转发，Key未上传。最终recheck阶段model_called=false，只修订现有真实生成稿并实际重测；其pytest=NOT_TESTED与前面的独立回归证据分开记录。
+
+## 14. 阶段05 — PC/Web正式交付（2026-10-29–30）
+
+功能实现与自动化验收已完成，人工教育判断不在自动化PASS中。命令、失败修复经过、源码与运行证据见PROGRESS末节；下表不借用模型自述判断执行成功。
+
+| 项目 | 结果 | 实际证据 |
+|---|---|---|
+| PC一键启动、真实本地目录、共享GUI/Core | PASS | `start-desktop.sh --workspace <仓库外真实目录> --runner-ssh ... --port 18007`实际运行；Python3.12、真实百炼、私有ISOLATED Runner；自动开GUI。macOS原生目录弹窗另列NOT_TESTED |
+| PC正式文件创建/覆盖/删除及拒绝 | PASS | `test_delivery.py`真实UTF-8/CRLF文件：覆盖拒绝前后字节一致；确认后字节变化；删除拒绝文件仍在、接受后消失、恢复Diff接受后重新出现 |
+| 文件Hash/版本/权限/路径/审批闸口 | PASS | 旧草稿/外部改文件/跨会话/无PC能力口令/链接外跳拒绝；代码新版本未测、待审整包变旧均不能写入；旧PASS不直接恢复 |
+| 多文件部分中断、持久提交后崩溃恢复 | PASS | 注入第二文件写入失败：首文件保留现场、第二文件未写，不自动重放；恢复Diff经确认再回退。提交完成但工具尚未回填时重开SQLite，补齐一次工具消息、mtime不变 |
+| PC真实模型完整主线与进程重启 | PASS | Chrome初中A班5程序/17用例；逐项接受、正式Diff拒绝/再接受、真实落盘、ZIP；待审批与已提交各杀进程重启，快照、文件、审核与会话保留 |
+| Web真实模型完整主线与故意失败 | PASS | Chrome初中B班5程序/18用例；故意错误实际stdout不匹配，恢复原代码后同规格PASS；逐项接受、正式Diff、ZIP、刷新与新cookie资源404 |
+| 公网第二浏览器引擎与大学配置 | PASS | WebKit26.5从新上下文访问 `https://111.229.226.186`，真实大学A班5程序/16用例、逐项接受、正式提交、ZIP、刷新和归属隔离；`.runtime/stage05-webkit-browser.json` |
+| 两学段、两班情教育结构/代码交付 | PASS（技术/内容协议） | 5项真实容器交付测试覆盖初中A/B、大学；固定规格、45分钟、三档评分及完整包；浏览器真实模型三场景共15程序/51条初始用例。人工内容适配判断仍待教师 |
+| ZIP内容/报告/版本Hash | PASS | 三份浏览器实际下载包独立解包：各5份Python与5份PASS报告；JSON/Markdown/题目评分/规格/manifest齐全，Hash全匹配；当前包另有正式提交凭据 |
+| 持续部署与外网HTTPS | PASS | 实际证书链、IP SAN、外网curl、Chrome/WebKit；API无Docker Socket且只绑定127.0.0.1，Manager无公网端口；数据持久卷与重启策略；原默认站点保留 |
+| 156后端、前端类型/构建、静态Review | PASS | `.runtime/stage05-final-backend.xml`；ruff；TypeScript/Vite；ui-ux与ui-ux-pro-max认知/布局取舍、web-design-guidelines源码/截图Review |
+| Firefox兼容性 | FAIL（本机测试环境） | Firefox图形子进程启动超时，未进入产品页面；保留 `.runtime/stage05-chrome-pass-firefox-launch-fail.json` 的整体FAIL。该文件内两个Chrome场景独立PASS，第二引擎由WebKit补齐 |
+| 真实教师教育审查/现场机器/≤5分钟视频 | NOT_TESTED | 审核点击均为明确标识的自动化合成动作；阶段06继续完成真实教学审查与最终面试交付 |
+| 原生目录弹窗、第三条独立网络、证书未来续期 | NOT_TESTED | CLI选目录已测；现有PC网络到VPS的HTTPS已测；证书首次签发、当前有效期和每日续期定时器已检查，未来运行尚未观测 |
+
+本轮明确限制：多文件逐文件原子替换，整组可能部分写入，须依提交日志和恢复Diff人工确认；不声称整组文件系统事务。Web为有限预算演示，非生产多租户部署。IP证书到期为2026-11-05 14:07（Asia/Shanghai），每日续期检查已启用。无Git提交/推送，无密钥进入仓库。最终三份文档与命令在本轮更新，不将阶段06尚未交付的视频/现场验收标PASS。
+
+最终运行汇总：[stage05-summary.json](../.runtime/stage05-summary.json)。业务源码与部署逐文件Hash核对PASS；最后一次156项后端/5项真实容器回归均无失败、无skip。重部署后历史正式包仍可导出。运行证据仅保存在本机忽略目录，不包含模型Key或SSH口令。
+
+## 15. 阶段05专项验收 — 全新工作区复验（2026-10-30）
+
+本轮重新执行，不把第14节的历史结果直接计为本轮通过。PC使用仓库外全新真实目录 `/private/tmp/yunyun-stage05-teacher-d8m6_ob2`；Web使用新的浏览器上下文、cookie和沙箱工作区。未复用上轮会话。审核点击为自动化合成教师动作，不能代替人工教育判断。
+
+| PC步骤 | 结果 | 本轮实际证据 |
+|---|---|---|
+| 1 启动本地服务 | PASS | 新PC API进程监听127.0.0.1:18006；独立验收数据库避免恢复探针影响原PC会话；继承并合并原费用预留 |
+| 2 打开真实教案目录 | PASS（运行配置绑定） | 绑定上述真实目录，文件树与实际文件一致；原生目录选择对话框未操作，另列NOT_TESTED |
+| 3 提出备课需求 | PASS | Chrome发送自然语言，真实百炼调用get_education_context/propose_lesson/verify_lesson |
+| 4 生成并查看文件 | PASS | 生成完整教案、示例与三档题；批准后在界面打开实际published教案文件并核对“教学目标”内容 |
+| 5 执行真实代码测试 | PASS | 5程序、17条固定用例通过；报告不是模型自报 |
+| 6 拒绝一次文件修改 | PASS | 界面修改已有formal.md、查看覆盖Diff、拒绝；文件bytes与原始值完全相等，不仅仅拒绝新建文件 |
+| 7 接受一次修改 | PASS | 对同一草稿重新审批并接受；正式文件字节与编辑值完全一致 |
+| 8 重启后恢复会话 | PASS | 待审批、已提交教案包、已有文件接受后三次SIGKILL重启；原会话恢复、正式文件内容保留且mtime未变化，无重复写入 |
+
+| Web步骤 | 结果 | 本轮实际证据 |
+|---|---|---|
+| 1 打开部署地址 | PASS | 实际HTTPS地址 https://111.229.226.186；证书校验开启；Chrome/WebKit完整链路，不仅检查HTTP200 |
+| 2 导入班级练习数据 | PASS | 文件输入控件实际选择class_B.csv；服务端只读核对source_hash与上传文件SHA256一致；观察为0未交/0死循环/8边界错误 |
+| 3 输入循环结构备课要求 | PASS | 新会话真实模型处理45分钟自然语言需求 |
+| 4 查看教案与分层练习 | PASS | 界面切换教案、示例、三档练习；45分钟、2示例/3练习、每题100分结构断言通过 |
+| 5 展示真实验证失败 | PASS | 候选改为print("intentional-wrong")；n=0实际输出不为空，真实OUTPUT_MISMATCH，退出0也不算通过 |
+| 6 修复或阻止错误交付 | PASS | 失败代码“接受”按钮禁用；package与delivery直接请求均409且无新审批；恢复代码后原固定规格不变、真实重测通过 |
+| 7 查看错因预警 | PASS | 展开错因页，逐条核对触发条件、原因假设和课堂干预；观察/预测标签及班情依据可查看 |
+| 8 审核并导出教案包 | PASS | 逐项接受、查看Diff、拒绝/再接受正式交付后下载ZIP；5份Python/固定规格/教案JSON与Markdown/评分/报告/manifest/提交凭据齐全且Hash一致 |
+
+附加验收：
+
+- **UI与状态 PASS（本轮范围）**：浅紫白色、历史/对话/可展开工作区、Lucide、文件Diff与逐项审核符合UI_GUIDELINES。修复长操作只有置灰反馈：运行测试/保存/审批增加明确状态；下载增加加载状态、防重复触发；文件读取有状态；编辑保存时禁止重复操作。真实非法评分返回422，明确显示错误并保留编辑值/原版本；测试与下载加载态通过仅延迟真实请求的自动化检查，未伪造执行结果。
+- **共享核心 PASS**：本机与部署容器实际导入的Agent、教育服务、工具、验证、提交、工作区模块逐文件Hash一致；三场景使用相同Runner策略Hash和同一原生工具链。两端React业务源代码一致，构建产物分别核验；未将不同构建环境的压缩产物声称为逐字节相同。
+- **权限边界 PASS（已测入口）**：每场景7种越界/绝对/敏感/混合路径请求均403；跨cookie读取会话/文件、修改草稿均404；Web本地目录接口403、客户端指定服务器root为422、跨源写入403。实际API容器仅挂/data及私有Runner socket，无Docker Socket。真实候选容器观察无宿主/app、/root/.ssh、模型Key与Docker Socket、不能写根目录/访问外网；资源限额及派生进程清理通过。此结论只覆盖已测接口和隔离策略，不是任意敌意代码的强隔离证明。
+
+本轮命令：
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_education_api.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_delivery.py -q -o junit_family=xunit1 --junitxml=.runtime/stage05-acceptance-backend.xml
+.venv/bin/python scripts/verify_stage05.py root@<授权宿主> --browser --url https://111.229.226.186 --evidence-prefix stage05-acceptance
+.venv/bin/python scripts/verify_stage05.py root@<授权宿主> --tests-only --evidence-prefix stage05-acceptance
+npm --prefix frontend run build
+.venv/bin/ruff check backend scripts
+```
+
+结果：**156项后端通过**；其中安全/恢复专项78通过是子集，不重复计数；**6项真实容器交付/隔离通过**；Chrome PC A班/Chrome Web B班/WebKit大学A班三场景通过，15程序/51条初始用例，另有故意失败及修复执行；所有三份ZIP均15文件，Hash全匹配。无失败/skip，后端保留1条既有Starlette弃用警告。
+
+本轮证据：[汇总](../.runtime/stage05-acceptance-summary.json)、[浏览器逐项结果](../.runtime/stage05-acceptance-browser.json)、[156项JUnit](../.runtime/stage05-acceptance-backend.xml)、[6项真实容器JUnit](../.runtime/stage05-acceptance-real-delivery.xml)、[上传文件Hash](../.runtime/stage05-acceptance-upload.json)、[ZIP核对](../.runtime/stage05-acceptance-packages.json)、[失败截图](../.runtime/stage05-acceptance-web-chrome-B-failure.png)、[处理中截图](../.runtime/stage05-acceptance-web-chrome-B-verifying.png)、[实际文件覆盖Diff](../.runtime/stage05-acceptance-pc-chrome-A-overwrite-diff.png)。均为本机忽略的运行证据。
+
+**NOT_TESTED**：原生目录选择对话框的人工点击、真实教师对教学内容/难度/评分的专业审核、第三条独立外部网络。Firefox本轮未重跑，不借用Chrome/WebKit通过结论声称Firefox兼容。PC自动化验收进程结束后已清理，真实目录、文件和证据保留。未提交/推送Git，未增加业务功能。
+
+
+## 16. 阶段05评审五项缺陷回归（2026-10-30）
+
+范围为评审列出的两项P1、三项P2修复，优先恢复完整流程，没有继续增加业务功能。第15节的公网主线PASS为历史证据，本轮未重新发布，不能据此宣称线上已包含修复。
+
+| 问题 | 结果 | 可复查条件 |
+|---|---|---|
+| 提交中断无法恢复 | PASS | 真实子进程在写前、首文件替换后、全部文件替换后但日志未完成时os._exit(73)；重开SQLite/Agent后四类记录同步INTERRUPTED；恢复/新提交（含同目录另一会话）返回RECOVERY_REQUIRED。全未写拒绝、部分回退、全已写确认均可继续原任务；后者mtime不变，原调用仅一个最终工具结果/一个提交日志 |
+| 迟到响应污染会话 | PASS（界面控制流） | Chrome/WebKit延迟A保存/验证/审批及文件响应，切B并发起B审批，再释放A；选中会话/消息/预览/审批始终为B，B的pending不被清除。A游标100、B游标2；迟到班情读取也被丢弃，文件选择不残留 |
+| Python删除入口分歧 | PASS | 使用真实Agent工具协议的脚本Provider提出.py删除，能进入PENDING；拒绝保持原字节，接受后真实文件消失；存在其他未通过Python时仍VERIFICATION_REQUIRED。6项真实容器回归额外覆盖失败代码/过期验证不得交付 |
+| 覆盖扩大读取权限 | PASS | 实际0600文件批准覆盖、历史回退后内容/权限均正确；新文件0600；模拟旧待审批无权限字段，600/640均在实际新提交时记录并正确回退 |
+| 1 MiB上传协议 | PASS | 前端File原字节POST /class-profiles/upload，CSV/中文转义JSON/540065字节/1048576字节/BOM均核对Hash，超过上限明确报错。真实后端测试普通及BOM JSON三个大小，返回与持久化source_hash均为上传原始字节Hash，1048577字节413 |
+| 对账边界与UI | PASS | 新GET/POST入口检查会话所有权、跨cookie404、版本冲突、磁盘快照Hash及未知外部修改；未知外部文件不被覆盖。界面显示Diff/Hash/权限、可用与禁用操作、加载/错误提示，完成后解除继续任务的阻断 |
+
+实际命令：
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_education_api.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_delivery.py backend/tests/integration/test_stage05_review.py -q -o junit_family=xunit1 --junitxml=.runtime/stage05-review-backend.xml
+.venv/bin/python scripts/verify_stage05.py root@111.229.226.186 --tests-only --evidence-prefix stage05-review
+YUNYUN_PLAYWRIGHT_MODULE=/Users/chenxi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright node scripts/review-stage05-browser.cjs
+.venv/bin/python scripts/smoke_startup.py
+npm --prefix frontend run build
+.venv/bin/ruff check backend scripts
+git diff --check
+```
+
+结果：**172项后端PASS**（新增16项；1条既有Starlette弃用警告）、**6项真实容器PASS**、**22项Chrome/WebKit界面控制流PASS**；PC/Web进程启动/重启冒烟PASS（显式Mock）。浏览器HTTP后端为显式夹具，仅检验竞态、传输与对账交互；真实文件、数据库、API所有权与真实代码执行分别由后端/容器回归证明，没有把夹具响应当作真实验证证据。后端需按以上显式集合运行：直接混合收集全目录会遇到既有同名test_education模块；真实集成另需Runner socket配置，未配置不应计PASS。
+
+证据：[后端JUnit](../.runtime/stage05-review-backend.xml)、[真实容器JUnit](../.runtime/stage05-review-real-delivery.xml)、[浏览器逐项结果](../.runtime/stage05-review-browser.json)、[会话归属截图](../.runtime/stage05-review-chrome-session-scope.png)、[对账界面](../.runtime/stage05-review-chrome-recovery.png)。UI检查采用本轮截图及源码，遵循UI_GUIDELINES，保持浅紫/白色、历史/对话/可展开工作区，突出恢复Diff与明确审核按钮。
+
+**NOT_TESTED/剩余边界**：本轮代码的公网部署和公网完整备课未做；真实模型整课未重跑；真实教师教育审核、原生目录选择器人工操作未做。修复前历史日志缺失的原权限无法推断，采用保守0600；未知外部文件变更仍需人工核对后重新对账。未Git提交、推送或更新生产配置。

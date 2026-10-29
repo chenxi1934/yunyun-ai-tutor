@@ -28,9 +28,7 @@ async def test_restart_restores_approval_draft_pending_calls_and_usage(setup_age
         assert reopened.get("workspaces", session["workspace_id"])["root"] == str(root)
         assert reopened.get("runs", run["id"])["status"] == "WAITING_APPROVAL"
         approval = reopened.find("approvals")[0]
-        with pytest.raises(AppError) as error:
-            restored.reject(approval["id"], 1, approve=True)
-        assert error.value.code == "PUBLISH_NOT_READY"
+        # 阶段05已开放明确批准；本例仍验证拒绝后的恢复且不发生写入。
         restored.reject(approval["id"], 1)
         restored.prepare_resume(session["id"], 2)
         await restored.run(run["id"])
@@ -152,5 +150,33 @@ async def test_compacted_history_restart_can_read_and_revise_full_draft(setup_ag
         latest = reopened.find("drafts", session["id"])[-1]
         assert latest["content"] == revised and latest["parent_id"] == draft["id"]
         assert not (restored.workspace(session).root / "long.md").exists()
+    finally:
+        reopened.close()
+
+
+async def test_restart_after_durable_commit_finishes_tool_once_without_rewriting(setup_agent):
+    def publish(messages):
+        did = json.loads(messages[-1]['content'])['data']['draft_id']
+        return reply(('request_publish', {'draft_id': did}))
+    agent, store, session, root = setup_agent(ScriptedProvider(
+        reply(('propose_patch', {'path': 'committed.md', 'content': '正式内容', 'base_hash': None})), publish))
+    run = agent.new_run(session['id'], '生成待审草稿', 0, 'commit-crash-0001')
+    await agent.run(run['id'])
+    approval = agent.delivery.hydrate(store.get('sessions', session['id']), store.find('approvals')[0])
+    # 注入崩溃窗口：文件/提交日志已持久化，但工具结果尚未回填。
+    agent.delivery.commit(session, approval)
+    before = (root / 'committed.md').stat().st_mtime_ns
+    reopened = Store(agent.settings.yunyun_data_dir / 'state.sqlite3')
+    try:
+        restored = Agent(agent.settings, reopened, ScriptedProvider())
+        reopened.recover()
+        restored.delivery.recover()
+        restored.delivery.recover()
+        assert reopened.get('runs', run['id'])['status'] == 'INTERRUPTED'
+        assert reopened.get('calls', approval['call_id'])['status'] == 'DONE'
+        wires = [m for m in reopened.messages(session['id']) if m.get('tool_call_id') == approval['call_id']]
+        assert len(wires) == 1
+        assert len(reopened.find('commits')) == 1
+        assert (root / 'committed.md').stat().st_mtime_ns == before
     finally:
         reopened.close()

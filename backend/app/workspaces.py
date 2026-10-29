@@ -2,7 +2,7 @@ import os
 import stat
 from pathlib import Path, PurePosixPath
 
-from app.domain import AppError, sha
+from app.domain import AppError, sha, uid
 
 
 def is_python_path(path: str) -> bool:
@@ -69,12 +69,12 @@ class Workspace:
                 if len(data) > self.max_bytes:
                     raise AppError("FILE_TOO_LARGE", "文件超过 64 KiB 读取上限。", 413)
                 content = data.decode("utf-8")
-                return {"path": path, "content": content, "hash": sha(content)}
+                return {"path": path, "content": content, "hash": sha(content), "mode": stat.S_IMODE(info.st_mode) & 0o777}
             finally:
                 os.close(target)
         except FileNotFoundError:
             if allow_missing:
-                return {"path": path, "content": "", "hash": None}
+                return {"path": path, "content": "", "hash": None, "mode": None}
             raise AppError("FILE_NOT_FOUND", "工作区内没有该文件。", 404) from None
         except UnicodeDecodeError:
             raise AppError("ENCODING_ERROR", "仅支持 UTF-8 教学文本。", 422) from None
@@ -119,3 +119,64 @@ class Workspace:
         finally:
             os.close(root)
         return result
+
+    def replace(self, path: str, content: str | None, expected_hash: str | None, *,
+                mode: int | None = None, expected_mode: int | None = None):
+        """提交服务专用：目录句柄内原子替换；再次校验外部文件和链接。"""
+        parts = self.parts(path)
+        if content is not None and len(content.encode('utf-8')) > self.max_bytes:
+            raise AppError('FILE_TOO_LARGE', '正式文件超过64 KiB。', 413)
+        fd = self._root_fd()
+        temporary = None
+        try:
+            for part in parts[:-1]:
+                if content is not None:
+                    try:
+                        os.mkdir(part, mode=0o755, dir_fd=fd)
+                    except FileExistsError:
+                        pass
+                nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                os.close(fd)
+                fd = nxt
+            # 校验后只操作已打开的父目录，避免父路径被替换后写到外部。
+            def current_state():
+                try:
+                    target = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+                except FileNotFoundError:
+                    return None, None
+                try:
+                    info = os.fstat(target)
+                    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > self.max_bytes:
+                        raise AppError('PATH_DENIED', '目标已变为链接或不可写教学文件。', 403)
+                    with os.fdopen(os.dup(target), 'r', encoding='utf-8', newline='') as stream:
+                        return sha(stream.read(self.max_bytes + 1)), stat.S_IMODE(info.st_mode) & 0o777
+                finally:
+                    os.close(target)
+            original_hash, original_mode = current_state()
+            if original_hash != expected_hash or (expected_mode is not None and original_mode != expected_mode):
+                raise AppError('REVISION_CONFLICT', '正式文件已被外部修改，请重新生成Diff。', 409)
+            if content is None:
+                os.unlink(parts[-1], dir_fd=fd)
+            else:
+                temporary = '.yunyun-' + uid()
+                target = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                 0o600, dir_fd=fd)
+                with os.fdopen(target, 'wb') as stream:
+                    stream.write(content.encode('utf-8'))
+                    stream.flush()
+                    target_mode = mode if mode is not None else (original_mode if original_mode is not None else 0o600)
+                    if not 0 <= target_mode <= 0o777:
+                        raise AppError('INVALID_MODE', '文件权限超出普通访问位范围。', 422)
+                    os.fchmod(stream.fileno(), target_mode)
+                    os.fsync(stream.fileno())
+                if current_state() != (original_hash, original_mode):
+                    raise AppError('REVISION_CONFLICT', '写入前目标版本已变化。', 409)
+                os.replace(temporary, parts[-1], src_dir_fd=fd, dst_dir_fd=fd)
+                temporary = None
+            os.fsync(fd)
+        except (OSError, UnicodeError):
+            raise AppError('WORKSPACE_WRITE_FAILED', '文件写入失败或目标包含链接，请检查工作区。', 409) from None
+        finally:
+            if temporary:
+                os.unlink(temporary, dir_fd=fd)
+            os.close(fd)

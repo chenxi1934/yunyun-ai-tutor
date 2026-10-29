@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.agent import Agent
 from app.config import PROJECT_ROOT, Settings
+from app.delivery_api import register_delivery
 from app.domain import AppError, Decision, NewMessage, NewSession, Resume, dumps, sha, uid
 from app.education.api import register_education
 from app.providers import Provider
@@ -31,6 +32,7 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
     @asynccontextmanager
     async def lifespan(app):
         store.recover()
+        agent.delivery.recover()
         yield
         for task in tasks.values():
             task.cancel()
@@ -61,7 +63,10 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
                 size = int(request.headers.get("content-length", "0"))
             except ValueError:
                 size = 999999
-            limit = 1052672 if '/class-profiles' in request.url.path else 262144
+            if request.url.path.endswith('/class-profiles/upload'):
+                limit = 1048576
+            else:
+                limit = 1052672 if '/class-profiles' in request.url.path else 262144
             if size > limit:
                 return failure(AppError("REQUEST_TOO_LARGE", "请求内容过大。", 413), request.state.request_id)
         response = await call_next(request)
@@ -115,6 +120,7 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
             tasks[rid] = asyncio.create_task(execute())
 
     register_education(app, agent, session, result, execution_lock)
+    register_delivery(app, agent, session, result, execution_lock)
 
     @app.get("/api/health")
     async def health(request: Request):
@@ -132,7 +138,7 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
                                 "model": "MOCK_LLM" if settings.llm_provider == "mock" else settings.llm_model,
                                 "mock": settings.llm_provider == "mock",
                                 "key_configured": bool(settings.dashscope_api_key.get_secret_value()),
-                                "runner": "ISOLATED" if await runner_identity() else "UNAVAILABLE", "publish": "UNAVAILABLE"})
+                                "runner": "ISOLATED" if await runner_identity() else "UNAVAILABLE", "publish": "AVAILABLE", "workspace_name": settings.yunyun_workspace.name if settings.yunyun_workspace else None})
 
     @app.post("/api/client")
     async def client(request: Request):
@@ -167,6 +173,10 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
                                 "tool_calls": store.find("calls", sid),
                                 "drafts": store.find("drafts", sid),
                                 "approvals": store.find("approvals", sid),
+                                "commits": store.find("commits", sid),
+                                "profiles": agent.education.profiles(sid),
+                                "lessons": [agent.education.view(sid, lid) for lid in dict.fromkeys(r["lesson_id"] for r in store.find("lessons", sid))],
+                                "workspace_name": "示例教学工作区" if value["mode"] == "web" else agent.workspace(value).root.name,
                                 "test_specs": store.find("test_specs", sid),
                                 "verification_reports": [{**r, "effective_status": agent.verification.report_status(r, identity)}
                                                          for r in store.find("reports", sid)],
@@ -236,9 +246,15 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
 
     @app.post("/api/approvals/{aid}/decision")
     async def decide(request: Request, aid: str, body: Decision):
-        resource(request, "approvals", aid)
-        agent.reject(aid, body.expected_revision, body.decision == "approve")
-        return result(request, {"status": "REJECTED", "formal_file_changed": False})
+        approval = resource(request, "approvals", aid)
+        try:
+            identity = await agent.verification.runner.identity()
+        except AppError:
+            identity = None
+        with store.tx():
+            agent.verification.refresh(approval['session_id'], identity)
+        approval = agent.reject(aid, body.expected_revision, body.decision == "approve")
+        return result(request, {"status": approval['status'], "formal_file_changed": approval['status'] == 'COMMITTED'})
 
     @app.get("/api/sessions/{sid}/events")
     async def events(request: Request, sid: str, after: int = 0, follow: bool = True):

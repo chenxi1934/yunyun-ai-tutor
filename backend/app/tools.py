@@ -71,10 +71,11 @@ def schemas() -> list[dict]:
 
 
 class Registry:
-    def __init__(self, store: Store, verification: VerificationService | None = None, education=None):
+    def __init__(self, store: Store, verification: VerificationService | None = None, education=None, delivery=None):
         self.store = store
         self.verification = verification
         self.education = education
+        self.delivery = delivery
 
     @staticmethod
     def timeout_seconds(name: str) -> float:
@@ -250,25 +251,11 @@ class Registry:
                 raise AppError("RUNNER_UNAVAILABLE", "NOT_TESTED：隔离执行器不可用。", 503)
             return self.verification.commit(prepared["report"])
         if name == "request_publish":
-            draft = self._draft(args.draft_id, sid)
-            lessons = self.store.find('lessons', sid)
-            if lessons and not self.education.view(sid, lessons[-1]['lesson_id'])['delivery_ready']:
-                raise AppError('EDUCATION_REVIEW_REQUIRED', '教育产物须完成代码验证和教师逐项审核。', 409)
-            current = prepared["file"] if prepared is not None else ws.read(draft["path"], allow_missing=True)
-            if current["hash"] != draft["base_hash"]:
-                raise AppError("REVISION_CONFLICT", "正式文件已变化，需重新生成草稿。", 409)
-            latest = [d for d in self.store.find("drafts", sid) if d["path"] == draft["path"]][-1]
-            if latest["id"] != draft["id"]:
-                raise AppError("STALE_DRAFT", "已有新草稿，请审核最新版本。", 409)
-            if any(is_python_path(d["path"]) for d in self.store.find("drafts", sid)):
-                self.verification.delivery_candidates(sid)
-                if is_python_path(draft["path"]) and not self.verification.current_pass(draft):
-                    raise AppError("VERIFICATION_REQUIRED", "代码尚未通过当前规格，不能审核交付。", 409)
-            approval = {"id": uid(), "session_id": sid, "run_id": rid, "call_id": call["id"],
-                        "draft_id": draft["id"], "status": "PENDING", "created_at": now(),
-                        "content_hash": draft["content_hash"], "base_hash": draft["base_hash"]}
-            self.store.put("approvals", approval)
-            self.store.event(sid, rid, "approval.requested", approval)
-            return {"status": "WAITING_APPROVAL", "approval_id": approval["id"],
+            if self.delivery is None:
+                raise AppError('PUBLISH_NOT_READY', '提交服务未配置。', 503)
+            approval = self.delivery.prepare_draft(session, args.draft_id,
+                original=prepared['file'] if prepared is not None else None,
+                run_id=rid, call_id=call['id'])
+            return {"status": "WAITING_APPROVAL", "approval_id": approval['id'],
                     "formal_file_changed": False}
         raise AppError("TOOL_NOT_ALLOWED", "工具不在白名单内。", 403)

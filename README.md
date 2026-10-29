@@ -1,12 +1,14 @@
 # 耘耘AI助教
 
-阶段 04 教育核心：Python 3.12 / FastAPI / Pydantic / SQLite，共享串行 Agent Core，React / TypeScript / Vite / Tailwind 教师工作台。当前可真实调用百炼工具、读授权工作区、保存草稿、查看 diff、暂停审批及恢复会话，并通过API完成结构化备课、班情导入、逐项修订和审核。
+教师备课 mini Agent，PC/Web 共享 **React / TypeScript / Vite UI** 和 **Python 3.12 / FastAPI / Pydantic / SQLite Agent Core**。首版聚焦45分钟《循环结构》，支持初中与大学、两套合成班情。
 
-**所有课堂示例和练习参考解须经独立隔离 Runner 真实验证，失败最多自动修复两次；固定用例全部通过后才可待教师审核。** 结构化教育功能由API/Agent工具提供，未新增教育界面。可导出教师逐项审核的JSON/Markdown/代码文件组合；正式批准/落盘与ZIP仍待阶段05。未配置 Runner 时明确返回 `RUNNER_UNAVAILABLE / NOT_TESTED`，PC/Web 均不降级为宿主 subprocess。
+**Web 演示（上轮部署地址）：[https://111.229.226.186](https://111.229.226.186)**。上轮使用真实百炼 `qwen3.8-max`、独立容器 Runner，非 Mock。演示只使用汇总/合成班情，不上传学生姓名、学号或真实学生代码。
 
-## 安装与配置
+2026-10-30：阶段05主线已做自动化验收；随后修复提交中断恢复、跨会话迟到响应、Python删除契约、文件权限和原文上传五项缺陷，专项回归通过。**本轮修复未部署，当前代码的公网验收为 NOT_TESTED**；上轮公网证据不能证明这些修复已上线。人工教学适配审查、现场机器验收和演示视频待完成。证据与限制见 [PROGRESS](docs/PROGRESS.md)、[ACCEPTANCE](docs/ACCEPTANCE.md)。
 
-需要 Python **3.12**（不要误用 macOS 系统 Python 3.9）、Node 22.19+、npm。
+## 安装
+
+需要 Python **3.12**、Node **22.19+**、npm；不要误用 macOS 系统 Python 3.9。
 
 ```bash
 python3.12 -m venv .venv
@@ -15,107 +17,119 @@ npm --prefix frontend install --package-lock=false
 npm --prefix frontend run build
 ```
 
-将 `.env.example` 复制为本地 `.env`，填写 `DASHSCOPE_API_KEY`。已有 `.env` 请保留。默认平台为百炼，地址 `https://dashscope.aliyuncs.com/compatible-mode/v1`，模型 `qwen3.8-max`，关闭 thinking。更换模型还需显式配置经核对的 `LLM_INPUT_CNY_PER_MILLION` 与 `LLM_OUTPUT_CNY_PER_MILLION`；`qwen3.8-max` 估价采用输入 ¥12/百万、输出 ¥36/百万。
+参照 `.env.example` 在本地 `.env` 配置 `DASHSCOPE_API_KEY`；保留已有配置，不将凭据提交 Git。默认百炼兼容地址 `https://dashscope.aliyuncs.com/compatible-mode/v1`、`qwen3.8-max`，关闭 thinking；更换模型须显式核对并配置输入/输出价格。默认失败不会切换 Mock；只有显式 `LLM_PROVIDER=mock` 才进入带 `MOCK_LLM` 标记的演示，代码仍须真实执行。
 
-仅显式设置 `LLM_PROVIDER=mock` 才进入 **MOCK_LLM** 固定读文件演示；界面与事件醒目标识，真实 API 失败不自动切 Mock。密钥只在后端，`.env`、运行数据库和构建依赖均忽略于 Git。本阶段遵照仓库规则未生成锁文件，后续需另行授权固定完整依赖树。
+## PC 一键运行
 
-## 本机 PC
-
-先创建仓库外的教师目录，放入 UTF-8 教学 Markdown/Python/JSON/CSV/TXT 文件。然后一条命令启动：
+在仓库外创建教师教学目录，放入 UTF-8 Markdown / TXT / JSON / CSV / Python 文件。
 
 ```bash
-bash scripts/start-desktop.sh --workspace /绝对路径/教师教案目录
+# 已有本机私有Runner配置时
+bash scripts/start-desktop.sh --workspace /绝对路径/教师教学目录
+
+# 复用本项目服务器上的私有Runner，无需本机安装Docker
+# 先完成 SSH 登录；脚本可复用本次验收的控制连接或SSH agent
+MAX_PROJECT_CNY=33 bash scripts/start-desktop.sh \
+  --workspace /绝对路径/教师教学目录 --runner-ssh root@111.229.226.186
 ```
 
-服务仅监听 `127.0.0.1:8000`，启动入口生成本机能力口令，通过 URL fragment 交给页面并立即清除 fragment；口令保存在该标签页的 sessionStorage，不进入日志。`--no-browser` 可关闭自动打开浏览器，`--port 8001` 可更换端口。目录只通过启动参数授权；API 无任意开目录入口。草稿保存在应用 SQLite，正式目录不变。
+启动后自动打开浏览器。macOS 省略 `--workspace` 会弹出原生目录选择器；页面的“打开本地工作区”也可为新会话选择目录，旧会话继续绑定原目录。`--port 8001` 更换端口；`--no-browser` 供进程探针使用。原生选择器尚未人工验收，CLI指定真实目录已实际验证。
 
-## Web 开发与部署骨架
+本机服务只监听 loopback；能力口令通过 URL fragment 传入标签页，随即清除并保存在 sessionStorage，不进入日志。重启后通过启动入口重新打开页面以获得新口令，会话与历史继续保留。工作区不能包含应用数据库；密钥/隐藏文件、路径越界、符号/硬链接均拒绝。支持范围为教学文本，每文件64 KiB、最多200个可见文件。
+
+`--runner-ssh` 仅经加密SSH读取私有Runner配置并建立权限受限的Unix socket转发，退出清理转发；不把Token打印或写入前端。未连接有效隔离器时，PC/Web均明确显示执行器不可用，禁止代码交付，不降级到宿主子进程。
+
+## 教师操作流程
+
+1. 选择学段、年级、主题与A/B班情，或粘贴/上传汇总JSON/CSV。发送“根据班情备一节45分钟循环结构，生成示例和三档练习并真实测试”等自然语言需求。
+2. 查看对话和工具执行进度；右侧工作区按教案、示例代码、分层练习、错因预警展开。每条程序报告显示输入、期望、实际、stdout/stderr、退出码、耗时与Hash；失败不能接受或导出。
+3. 逐项接受、拒绝或继续修改；可编辑文字、代码与评分点。代码变更使旧PASS失效，重新运行后才能接受。历史版本可恢复为新草稿，重新验证/审核。
+4. 全部代码通过且全部教学项目接受后，点击“审核交付文件 Diff”。检查每个文件的新建/覆盖/删除、原Hash与新Hash，再“确认接受并写入”或拒绝。正式内容写入 `published/<lesson_id>/`；拒绝不改变文件字节。
+5. 下载ZIP：教案JSON/Markdown、5份Python示例/参考解、每题测试规格、评分点、真实报告、Hash manifest和正式提交凭据。发布后若文件被外部修改、教案变更、验证过期或审核撤销，下载被阻断。
+
+“文件与Diff”视图可读真实文件、创建/修改草稿、提出删除和审核单文件变更。待写入的Python内容需要冻结测试与真实验证；删除Python仅核对路径、原文件Hash及教师审批，其他失败或漏测代码仍阻断交付；它不提供任意shell或完整IDE。普通文件提交历史可创建回退Diff，再确认写入；历史代码不能直接恢复旧PASS，须先恢复教学项目为新版本并重测。
+
+多文件提交**逐文件原子替换，不承诺整组文件系统事务**。写入失败或重启恢复时，提交、审批、关联任务和工具调用同步中断，不自动重放。在“正式文件历史与恢复”点击“对账恢复”：全部未写入可确认拒绝；全部已写入可确认完成（不重写）；部分写入须查看回退Diff、明确确认后只回退已写入项并拒绝。内容或权限出现未知外部修改时保留现场，人工核对后重新对账。对账绑定磁盘Hash、权限及会话版本，解决前同一真实目录禁止新提交/导出，原任务须先完成对账再继续。
+
+覆盖保留原文件rwx权限；新文件默认 `0600`，提交日志记录回退所需权限。修复前的历史日志若未记录权限，无法推断原权限，回退采用保守 `0600`；旧待审批记录在本轮代码实际提交时会补齐权限。普通已完成提交仍通过新审批Diff回退，历史Python恢复仍须验证；中断对账回退只撤销未完成提交，不产生代码PASS证据。单API worker，同一实例串行执行Agent与验证任务。
+
+## Web 部署
+
+当前API容器只绑定 `127.0.0.1:18005`，Nginx提供HTTPS；现有默认站点保留。私有Manager不发布TCP端口；API无Docker Socket。新会话复制7个合成种子文件，资源绑定HttpOnly / SameSite=Strict / Secure cookie；刷新恢复，本浏览器之外的会话不能读取它的资源。
+
+在已授权、已安装Docker/Nginx/OpenSSL的宿主上，先通过SSH登录，再从本机运行：
 
 ```bash
-# 已构建的前端由同一API服务提供
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
-# 可选开发界面，/api 代理到本机8000
-npm --prefix frontend run dev
+.venv/bin/python scripts/deploy-web.py root@111.229.226.186 --domain 111.229.226.186
+curl -fsS https://111.229.226.186/api/runtime
 ```
 
-Web 会话从7个明确标识为 NOT_TESTED 的合成种子文件复制独立工作区。服务端随机 HttpOnly / SameSite=Strict cookie 绑定资源归属；PC 有本机能力口令，变更请求校验 Origin/Host。当前只支持一个 API worker，同一实例串行运行任务。数据库默认 `.runtime/state.sqlite3`，重启保持目录和 cookie 可恢复，运行中的任务转为 INTERRUPTED，需教师点击继续。
+脚本只替换本项目命名的API/Manager容器，保留 `/opt/yunyun-tutor/data`；凭据通过SSH stdin写入宿主0600配置，不进入源码包、构建参数或日志。会话数据库与工作区持续保存，容器配置自动重启。部署需要现有SSH鉴权，不在参数中提供口令。
+
+HTTPS采用 [acme-tiny（MIT）](https://github.com/diafygi/acme-tiny) 与Nginx；部署脚本下载官方客户端，并为IP证书做最小的IP identifier / shortlived profile / SAN适配。当前IP证书有效至 **2026-11-05 14:07（Asia/Shanghai）**，每日systemd任务在剩余2天内尝试续期；已验证首次签发和定时器启用，未来真实续期尚未观测。临时域名曾被云厂商备案拦截，当前使用已实测可访问的IP HTTPS入口。首次部署可用 `--domain` 指定自有域名；迁移域名还须重新核验HTTP验证路由与证书。
+
+公开演示预算单独限制为¥12、每会话¥6；本机本轮使用总限额¥33，合计上限¥45，保留原费用预留。金额为厂商usage估算，超时用量未知的预留不会清零。演示不包含账号体系、费用购买或生产多租户治理。
+
+## 私有 Runner
+
+Manager镜像入口 `runner/Dockerfile`；只有可信Manager可访问Docker Socket，API与候选容器均无此权限。API只配置私有 `RUNNER_SOCKET` / `RUNNER_TOKEN`。自建Manager使用 `python -m runner.manager`，须显式配置预拉取Python 3.12镜像的不可变 `RUNNER_IMAGE`。
+
+每条用例在一次性非root容器运行：无网络、只读根、cap-drop=ALL、no-new-privileges、默认seccomp、0.5CPU、128MiB、32pids、16MiB tmpfs、单case2秒、整程序30秒、stdout/stderr各64KiB。可信外部比对stdout，不信任候选自报PASS；超时/取消回收容器，清理失败关闭Runner。模型Key、教师目录、数据库和其他会话文件不挂入候选。
+
+## API 要点
+
+所有资源校验cookie归属、Host/Origin；PC变更另需本机能力口令。变更带 `expected_revision`；聊天另带幂等键。模型工具不包含教师批准/正式提交能力。
+
+| 接口 | 功能 |
+|---|---|
+| `POST /api/sessions`、`GET /api/sessions/{sid}` | 学段配置；恢复消息、草稿、报告、班情、教案、审批与提交历史 |
+| `POST .../class-profiles` | `{format,content,expected_revision}` 导入文字/JSON/CSV汇总班情 |
+| `POST .../class-profiles/upload?format=csv&expected_revision=0` | File原始字节上传，1 MiB上限；UTF-8解析支持BOM，source_hash保留原始字节Hash；不接收multipart |
+| `POST .../messages`、`POST .../resume`、`GET .../events` | 自然语言Agent；检查点继续；持久化SSE与游标回放 |
+| `PATCH .../lessons/{lid}/items` | `{expected_revision,item_id,replacement,reason}`；稳定ID、时间/评分/冻结任务约束 |
+| `POST .../lessons/{lid}/verify`、`POST .../reviews` | 整课真实验证；逐项接受/拒绝，代码PASS不能替代教学审核 |
+| `GET .../lessons/{lid}/export`、`GET .../json` | 经审核内容映射；或带未测/失败状态的草稿JSON快照，均不代替正式提交 |
+| `POST .../lessons/{lid}/delivery` | 生成精确文件Diff与待审批快照，暂不写入 |
+| `POST /api/approvals/{aid}/decision` | `{decision: approve/reject,expected_revision}`；再次核对版本/Hash/验证与审核 |
+| `GET .../lessons/{lid}/package` | 仅下载当前仍有效的正式提交ZIP |
+| `POST .../drafts`、`POST .../publish-draft` | 文件草稿；请求单文件正式审批 |
+| `POST .../commits/{cid}/restore-draft` | 已完成提交生成回退Diff，须再次审核；未解决中断不可走此入口 |
+| `GET .../commits/{cid}/recovery` | 中断对账：返回每项 BEFORE/AFTER/UNCHANGED/CONFLICT、现状Hash/权限、回退Diff、snapshot_hash及允许操作 |
+| `POST .../commits/{cid}/recovery` | `{expected_revision,snapshot_hash,decision: accept/reject/rollback}`；确认完整写入/确认未写入并拒绝/回退已写入并拒绝；拒绝未知外部修改 |
+| `POST .../test-specs` | 教师冻结独立Python文件用例；模型不能改规格 |
+
+上表 `...` 为 `/api/sessions/{sid}`，教案审核为 `.../lessons/{lid}/reviews`。冻结累加基准示例：`{"path":"sum.py","expected_revision":0,"baseline":"sum_1_to_n"}`；固定输入0/1/5分别输出0/1/15并带换行。自定义规格使用 `cases:[{id,input,expected}]`。教学任务有独立固定契约，不能减用例绕过验证。
+
+## 实际验证命令
 
 ```bash
-docker build -t yunyun-tutor:stage02 .
-docker run --rm --name yunyun-tutor -p 127.0.0.1:8000:8000 \
-  --env-file .env -e YUNYUN_MODE=web -e YUNYUN_DATA_DIR=/data \
-  -v yunyun-stage02-data:/data yunyun-tutor:stage02
-```
-
-镜像使用 Python 3.12，非 root，无 Docker Socket。该骨架不是公网发布：实际部署还需 HTTPS、同源反向代理、持久卷和私网 Runner；设置 `YUNYUN_HOSTS=域名,127.0.0.1` 与 `YUNYUN_SECURE_COOKIE=true`。不要公开当前阶段尚未具备完整费用/访问治理的演示实例，不要复用已有 80 端口服务。阶段 02 不提供任意 shell，也不使用裸 subprocess 执行模型代码。
-
-## 验证
-
-```bash
-# 离线控制流/权限/恢复测试，模型为测试Mock；不会消费Key
-.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_session_resume.py backend/tests/integration/test_api.py -q
+# 不消费模型Key：172项控制流/教育协议/权限/提交/恢复回归
+.venv/bin/python -m pytest backend/tests/unit \
+  backend/tests/integration/test_api.py backend/tests/integration/test_education_api.py \
+  backend/tests/integration/test_session_resume.py backend/tests/integration/test_delivery.py \
+  backend/tests/integration/test_stage05_review.py \
+  -q -o junit_family=xunit1 --junitxml=.runtime/stage05-review-backend.xml
 .venv/bin/ruff check backend scripts
 npm --prefix frontend run build
-# 真实启动PC/Web进程并停止、重启，读取静态界面和SSE；模型显式Mock，不启动浏览器
 .venv/bin/python scripts/smoke_startup.py
-# 阶段02真实HTTP验收：PC/Web真实模型调用、SIGKILL/恢复与错误分支；需Key，会消费额度
-.venv/bin/python scripts/verify_stage02.py
-# 显式真实API探针，有费用；随机标记读取→草稿→第二轮上下文
-.venv/bin/python scripts/probe_provider.py
-# 同一核心的Web模式真实探针；失败可显式加 --resume <探针会话ID>，预算保留
-.venv/bin/python scripts/probe_provider.py --mode web
-# 仅用户指定的SSH服务器：临时构建/运行，不上传.env，不发布端口，结束清理
-.venv/bin/python scripts/probe_remote.py user@host
-# 只检验远端真实Provider配置下的服务/静态资源，不上传Key、不调用远端模型
-.venv/bin/python scripts/probe_remote.py user@host --real-startup
+
+# React界面专项：显式HTTP夹具，只证明会话/上传/对账UI控制流，不能作为真实LLM/Runner证据
+# 若Playwright不在Node解析路径，通过YUNYUN_PLAYWRIGHT_MODULE指向现有安装；不修改项目依赖
+node scripts/review-stage05-browser.cjs
+
+# 真实容器交付及隔离：初中A/B、大学、失败/修复/审批过期、网络/文件/进程边界；6项，无模型费用
+.venv/bin/python scripts/verify_stage05.py root@111.229.226.186 --tests-only
+
+# 真实模型+真实浏览器，消费预算；已有Chrome时，按需安装项目内测试依赖
+npm install --prefix .runtime/browser --no-save --package-lock=false playwright
+env -u PLAYWRIGHT_DOWNLOAD_HOST .runtime/browser/node_modules/.bin/playwright install webkit
+# 用YUNYUN_PLAYWRIGHT_MODULE指向已有Playwright模块，YUNYUN_CHROME_PATH指定Chrome
+YUNYUN_PLAYWRIGHT_MODULE="$PWD/.runtime/browser/node_modules/playwright" \
+  .venv/bin/python scripts/verify_stage05.py root@111.229.226.186 --browser --url https://111.229.226.186
 ```
 
-本轮远端到官方PyPI文件下载存在超时，已验证腾讯镜像可构建。需要时对本次镜像显式指定 `docker build --build-arg PYPI_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple -t yunyun-tutor:stage02 .`，或为远端探针追加 `--pypi-index https://mirrors.cloud.tencent.com/pypi/simple`；不修改宿主全局源配置。
+真实容器测试无Runner时失败，不skip、不使用假报告。浏览器脚本创建全新工作区并实际重启PC进程；审核点击显式标为“自动化合成教师动作”，不是人工教育审查。已通过Chrome双端与WebKit公网主线；本机Firefox因图形进程启动错误未完成，不能据此声称Firefox兼容。证据在忽略的 `.runtime/stage05-*` 下；未将运行凭据或模型Key提交Git。
 
-默认上限：每 run 12 次模型请求、24 次工具调用、12 分钟主动时间、输入 80k / 输出 12k token、费用估算 ¥3；每会话 ¥9、实例累计 ¥45。请求前保守预留，厂商 usage 后结算估值，超时/中断预留不会清零。已结束 run 的消息和事件不因刷新重放。正式审批接口在本阶段只支持拒绝；批准会明确返回 `PUBLISH_NOT_READY`。
+阶段02–04原生工具/故障/教育探针仍保留在 `scripts/probe_provider.py`、`verify_stage02.py`、`verify_stage03.py`、`accept_stage04.py`；旧阶段证据的适用范围以PROGRESS与ACCEPTANCE历史记录为准。
 
-浏览器尚未验证。手动操作：启动 PC 后输入“读取工作区示例并提出修改草稿”，预期出现真实文件读取记录和 diff，正式文件不变；刷新恢复会话，检查失败提示、工作区展开及审核拒绝后的状态。完整验收状态与本阶段执行证据见 [PROGRESS](docs/PROGRESS.md) 和 [ACCEPTANCE](docs/ACCEPTANCE.md)。
-
-## 阶段 03：隔离验证与固定测试
-
-执行入口为 stdin/stdout Python 脚本，逐字节比较 UTF-8 stdout（包括换行），不能在候选内部自报断言/PASS。首个人工固定基准 `sum_1_to_n` 的输入 `0/1/5` 对应输出 `0/1/15`，均带换行。新题须由教师通过 API 冻结用例；模型不能添加、删除或修改冻结用例。
-
-1. 在专用可信宿主预拉取 Python 3.12 镜像，取得 `docker image inspect --format '{{.Id}}' python:3.12-slim` 的不可变 SHA256。该步骤由部署者执行，Runner 不自动拉取镜像。
-2. 独立启动 `python -m runner.manager`，通过进程环境配置 `RUNNER_IMAGE=<不可变ID>`、`RUNNER_TOKEN=<至少32字符随机口令>`、`RUNNER_SOCKET=<私有Unix socket绝对路径>`。Manager 可访问 Docker Socket，公网 API 不得拥有该权限。容器构建入口是 `runner/Dockerfile`。每个专用 Docker 宿主只运行一个 Manager；启动会回收 `yunyun.runner=stage03` 标签的孤儿作业。
-3. API 进程仅配置 `RUNNER_SOCKET`、`RUNNER_TOKEN`，共享私有 Unix socket；socket 为 0600，API 与 Manager 须使用可访问该 socket 的同一 UID。跨主机只使用私有转发。不要将 Docker Socket、教师目录、数据库或模型 Key 挂入候选容器。Manager 与公网 API 分开部署，Manager 不发布 TCP 端口。
-4. 教师先创建会话，然后 `POST /api/sessions/{sid}/test-specs`：`{"path":"sum.py","expected_revision":0,"baseline":"sum_1_to_n"}`；或用 `cases:[{"id":"zero","input":"0\n","expected":"0\n"}]` 替代 baseline。接口沿用 cookie、同源和 PC 能力口令校验；返回新规格 ID 并增加会话 revision。先停止活动任务才能改规格。此阶段未开发测试规格编辑界面。
-5. 发送备课请求时使用最新会话 revision。Agent 从索引读取草稿ID/规格ID，调用 `get_verification`、`run_python_tests`，根据真实错误修改代码并重测。UI 显示逐用例输入/期望/实际、日志/退出码、版本证据和修复 Diff。历史报告只作历史，任何代码/规格/镜像/策略变更均失效；测试通过仍需教师审核。
-
-固定执行策略：每用例 2 秒、每段代码整套 30 秒，stdout/stderr 各 64 KiB；非 root UID10001、0.5 CPU、128 MiB 内存且无额外 swap、32 pids、64 文件描述符、禁 core dump、只读根目录、16 MiB tmpfs、无网络、cap-drop=ALL、no-new-privileges、默认 seccomp。容器内部可用 Python 标准库和子进程，能力受同一容器限制；没有宿主命令工具。超时/取消删除整个容器，清理失败则关闭 Runner 并报告错误。
-
-真实容器测试不能使用执行桩，也不会因缺少 Runner 而 skip：
-
-```bash
-# 先以SSH agent或现有控制连接登录；不把SSH密码放入命令、源码或.env
-.venv/bin/python scripts/verify_stage03.py user@host
-# 加真实百炼纠错探针；在本机调用模型，Key不传服务器，沿用实例SQLite费用账本
-.venv/bin/python scripts/verify_stage03.py user@host --real-model
-# 已有私有Manager时，可通过进程环境YUNYUN_TEST_RUNNER_SOCKET/TOKEN直接运行
-.venv/bin/python -m pytest backend/tests/integration/test_verification.py -q
-```
-
-探针创建临时 Manager、候选容器与 Unix socket 转发，不发布公网端口，结束清理本次容器/镜像标签/远端源码。证据保存在忽略的 `.runtime/stage03-*.json/xml`。没有可用隔离器时如实失败，不在本机执行未知代码。容器共享宿主内核，Manager 的 Docker 权限是高信任边界；本阶段验证不等于公网生产加固或完整教育验收。
-
-## 阶段04：结构化备课API
-
-以下接口复用已建立的cookie与PC能力口令；当前不新增教育表单。`stage`在创建会话时显式选择`初中`或`大学`，大学同时传`grade: 大一`。主题仅支持《循环结构》。上传仅汇总合成/去标识数据，不传姓名、学号或学生代码。
-
-1. `POST /api/sessions/{sid}/class-profiles`：`{"format":"text","content":"5人未交、3人while死循环","expected_revision":0}`。返回事实、来源位置/Hash与未知项；会话revision递增。JSON格式为`{"class_size":40,"facts":[{"type":"boundary_error","count":8}]}`；CSV列为`type,count`，可选`class_size,denominator`。不支持推断未给出的0或人数交集。
-2. 文件上传：`POST /api/sessions/{sid}/class-profiles/upload?format=csv&expected_revision=0`，HTTP body为UTF-8文件原文（不是multipart），最多1 MiB/1000行。JSON同理`format=json`。冲突计数、负数、超分母、乱码均拒绝；无关个人信息列丢弃、不送模型。
-3. `GET /api/sessions/{sid}/education-context`取得事实预览、确定性策略、建议结构与固定用例。发送自然语言备课消息时使用最新会话revision，Agent调用`get_education_context → propose_lesson → verify_lesson`。也可把建议结构经教师编辑后`POST .../lessons`，body为`profile_id,profile_revision,base_revision,plan`；首次base_revision为0。
-4. `GET .../lessons/{lid}`查看全文、逐项revision/审核状态、代码报告ID、历史版本、失败尝试；`GET .../lessons/{lid}/json`下载**含未测/失败状态的草稿快照**，不表示可交付。完整执行日志由`GET /api/verification-reports/{report_id}`取得。
-5. `PATCH .../lessons/{lid}/items`：`expected_revision,item_id,replacement,reason`，replacement为该项目完整对象且保留ID；新版本保留父版本，必要代码/审核失效。环节时长单项修改仍须满足45分钟；同一班情不能换任务绕过测试。取历史项目内容再次PATCH即生成恢复草稿，原文件始终不变。
-6. `POST .../lessons/{lid}/verify`：`{"expected_revision":1}`，只重测需要验证的代码。`POST .../lessons/{lid}/reviews`：`expected_revision,item_id,decision: accept/reject,note`。逐项目接受/拒绝为教师独立API，模型无此工具。代码通过不自动接受目标、环节、错因或评分。
-7. 全部5份代码当前通过、无课程风险、班情未过期且全部项目接受后，`GET .../lessons/{lid}/export`返回`files`映射：JSON、Markdown、5份Python、用例、执行报告、文件Hash manifest。它是**教师已审核的草稿文件组合**；不写真实教师目录，不替代阶段05正式提交/ZIP。任一失败、漏测、过期、拒绝或待审核均阻断。
-
-可复跑验证（真实模型消耗既有实例预算，Key不上传）：
-
-```bash
-.venv/bin/python -m pytest backend/tests/unit/test_education.py backend/tests/integration/test_education_api.py -q
-.venv/bin/python scripts/verify_stage04.py user@host --real-model
-```
+2026-10-30专项验收使用全新PC目录和Web会话，逐项结果见 [ACCEPTANCE第15节](docs/ACCEPTANCE.md#15-阶段05专项验收--全新工作区复验2026-10-30)。可为上述验证命令追加 `--evidence-prefix stage05-acceptance` 保存独立证据；本轮补测已有正式文件的界面覆盖拒绝/接受与字节核对、实际CSV文件选择导入、失败交付409、加载/错误状态及真实容器越界限制。人工选目录弹窗和教师教育审核保持NOT_TESTED。

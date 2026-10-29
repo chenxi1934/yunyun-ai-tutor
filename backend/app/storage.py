@@ -9,7 +9,7 @@ from app.domain import AppError, dumps, now, uid
 
 class Store:
     tables = {"sessions", "workspaces", "runs", "calls", "drafts", "approvals", "usage", "test_specs", "reports", "repairs",
-              "class_profiles", "lessons", "education_reviews", "education_attempts"}
+              "class_profiles", "lessons", "education_reviews", "education_attempts", "commits"}
 
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,8 +94,39 @@ class Store:
             return self.db.execute("SELECT COALESCE(MAX(event_id),0) FROM events WHERE session_id=?",
                                    (sid,)).fetchone()[0]
 
+    def interrupt_commit(self, commit):
+        """在调用者事务内同步中断状态；不写文件，也不猜测工具最终结果。"""
+        changed = commit['status'] != 'INTERRUPTED'
+        commit['status'] = 'INTERRUPTED'
+        self.put('commits', commit)
+        approval = self.get('approvals', commit['approval_id'])
+        changed |= approval['status'] != 'INTERRUPTED'
+        approval['status'], approval['commit_id'] = 'INTERRUPTED', commit['id']
+        self.put('approvals', approval)
+        error = {'code': 'RECOVERY_REQUIRED', 'message': '正式写入中断，请先对账恢复；未自动重放文件操作。',
+                 'commit_id': commit['id']}
+        if approval.get('call_id'):
+            call = self.get('calls', approval['call_id'])
+            if call['status'] != 'DONE':
+                changed |= call['status'] != 'INTERRUPTED'
+                call['status'] = 'INTERRUPTED'
+                self.put('calls', call)
+            run = self.get('runs', approval['run_id'])
+            if run['status'] not in {'STOPPED', 'COMPLETED'}:
+                changed |= run['status'] != 'INTERRUPTED' or run.get('error') != error
+                run['status'], run['error'] = 'INTERRUPTED', error
+                self.put('runs', run)
+        if changed:
+            session = self.get('sessions', commit['session_id'])
+            session['revision'] += 1
+            self.put('sessions', session)
+            self.event(commit['session_id'], approval.get('run_id'), 'workspace.interrupted', error)
+
     def recover(self):
         with self.tx():
+            for commit in self.find('commits'):
+                if commit['status'] in {'APPLYING', 'ROLLING_BACK', 'INTERRUPTED'}:
+                    self.interrupt_commit(commit)
             for run in self.find("runs"):
                 if run["status"] in {"RUNNING", "READY"}:
                     run["status"] = "INTERRUPTED"

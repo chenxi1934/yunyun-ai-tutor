@@ -57,7 +57,7 @@ def register_education(app, agent, session, result, execution_lock):
         if format not in {'json', 'csv'}:
             raise AppError('INVALID_CLASS_DATA', '文件上传支持JSON或CSV。', 422)
         with mutation(request, sid, expected_revision) as value:
-            profile = education.import_profile(value, text, format)
+            profile = education.import_profile(value, text, format, source=bytes(content))
         return result(request, {'profile': profile})
 
     @app.get('/api/sessions/{sid}/education-context')

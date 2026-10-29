@@ -4,9 +4,9 @@ from app.domain import dumps, sha
 
 
 def render_files(view, reports):
-    """仅返回文件组合，不写教师目录；阶段05再处理正式提交/ZIP。"""
+    """生成经审核的内容快照；提交记录由DeliveryService独立产生。"""
     plan = view['plan']
-    lines = [f"# {plan['stage']}《{plan['topic']}》", '', '课时：45分钟。状态：教师已审核的草稿包，尚未正式落盘。', '',
+    lines = [f"# {plan['stage']}《{plan['topic']}》", '', '课时：45分钟。教师已逐项审核；正式写入状态以提交记录为准。', '',
              '代码PASS只适用于所列固定用例；教学正确性由教师审核。', '', '## 教学目标', '']
     for goal in plan['goals']:
         lines.append(f"- [{goal['id']}] {goal['title']}：{goal['criterion']}")
