@@ -83,19 +83,20 @@ SQLite 放宿主应用数据目录（Web 为专用持久卷），不暴露为模
 
 ### 3.1 模型 API 选择
 
-2026-10-29 已核对官方文档，尚未发起付费 API 请求。以下“文档支持”不能记为 A4 PASS。
+2026-10-29 用户已选定阿里云百炼作为阶段 02 的模型接入平台，官方文档已核对；尚未配置本地凭据或发起模型 API 请求。平台选择不等于接入成功，以下“文档支持”不能记为 A4 PASS。
 
 | 顺位 | 候选与模式 | 工具调用的明确依据 | 上线前仍需确认 |
 |---|---|---|---|
-| 首选 | DeepSeek 官方 Chat Completions，`deepseek-flash`，关闭 thinking | [Tool Calls 官方示例](https://api-docs.deepseek.com/guides/tool_calls/)明确使用 `tools`、`tool_calls`、`tool_call_id` 并把结果传回模型；[当前接入说明](https://api-docs.deepseek.com/)列出该模型 | 用户 Key、账户余额/限流、部署机可达性、返回 usage、真实闭环；模型别名可能更新，记录实际响应标识 |
-| 备选 | 阿里云百炼 Qwen-Plus 系列，具体可用 model_id 与地域从用户控制台确认，关闭 thinking | [Function Calling 官方文档](https://www.alibabacloud.com/help/en/model-studio/qwen-function-calling)列出支持系列和工具结果回传协议 | 同地域 Key/endpoint/model 组合、真实闭环；不使用已弃用的 Assistant API |
+| 已选平台/初始模型 | 阿里云百炼兼容 Chat Completions；初始模型建议 `qwen-plus`，关闭 thinking，模型 ID 可配置 | [Function Calling 官方文档](https://help.aliyun.com/zh/model-studio/qwen-function-calling)列出 Qwen-Plus 系列与原生工具调用协议；[调用示例](https://help.aliyun.com/zh/model-studio/model-calling-in-sub-workspace)给出用户所选 endpoint 与 `qwen-plus` | 本地安全配置凭据，实际确认账户模型权限、余额/限流、usage、工具调用往返；其他百炼模型启用前分别验证 |
 | 演示降级 | `MockProvider` | 固定响应，界面、事件、导出元数据显著带 `MOCK_LLM` | 不满足 A4；Runner 仍必须真实执行，禁止 Mock 报告 |
+
+用户指定 base_url 为 `https://dashscope.aliyuncs.com/compatible-mode/v1`。阶段 02 拟用 `LLM_PROVIDER=bailian`、`DASHSCOPE_BASE_URL`、`DASHSCOPE_API_KEY`、`LLM_MODEL` 配置平台、地址、凭据和模型；不因选择模型新增一套 Agent Core，也不默认开放所有模型。只记录非敏感的配置约定，密钥不进入文档、源码或 Git；本轮不写 `.env`。模型切换仍须满足原生 tool calling、结构校验与预算要求。
 
 不依赖“兼容 OpenAI”字样判定能力。Provider 标准接口为 `complete(messages, tool_schemas, limits) -> ModelReply(content, tool_calls[], finish_reason, usage, provider_metadata)`；保留原生 call ID 和工具/结果配对。HTTP 超时、鉴权、限流、无效 schema、截断分别返回可识别错误。SDK 或 HTTP 客户端可复用兼容协议，模型特有参数由各 Provider 管理。
 
 P0 先用非流式模型响应，SSE 流式展示工具/验证进度；不向用户输出隐藏推理。禁用 thinking 可缩小协议差异；若以后启用，必须按厂商要求保存并回传必要字段，另做契约测试。Pydantic 永远校验参数和产出，不能依赖 Beta strict schema 保证安全，也不把自然语言中的“调用工具”解析为已执行。
 
-0–5h 的真实 Provider 探针须：模型决定调用 `read_file` → 应用实际读一个无敏感信息的 fixture → 把真实内容与 call ID 回传 → 模型利用文件中的随机标记作答；再完成第二轮对话。保留脱敏消息、调用 ID、usage 与结果。只有 HTTP 200、普通聊天成功或模型声称读过文件均不够。主选失败才显式切换备选并记录原因，不能无提示切成 Mock。
+0–5h 的真实 Provider 探针须：模型决定调用 `read_file` → 应用实际读一个无敏感信息的 fixture → 把真实内容与 call ID 回传 → 模型利用文件中的随机标记作答；再完成第二轮对话。保留脱敏消息、调用 ID、usage 与结果。只有 HTTP 200、普通聊天成功或模型声称读过文件均不够。初始模型失败时先定位权限/参数/能力问题，再显式切换经验证的百炼模型并记录原因，不能无提示切成 Mock。
 
 ### 3.2 工具注册表与权限
 
@@ -317,7 +318,7 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 
 | 优先级 | 阻塞/当前证据 | 最晚发现点 | 处理与不可突破的底线 |
 |---|---|---|---|
-| R1 | 真实 API Key、地域/模型能力或网络不通；当前只核对文档，无调用证据 | 0–2h | 完成原生 tool_calls 往返探针与预算；备选也做同一探针。都失败明确 A4 缺口，不能用 Mock 宣称真实 Agent |
+| R1 | 百炼平台与 endpoint 已确定；凭据本地配置、账户模型权限、余额和真实工具调用尚未验证 | 0–2h | 完成百炼原生 tool_calls 往返探针与预算；替换模型也做同一探针。失败明确 A4 缺口，不能用 Mock 宣称真实 Agent |
 | R2 | 无可部署 VPS/稳定入口或 Docker daemon/镜像不可用；当前本机 daemon 不可连接、无公网目标 | 0–5h | 先最小部署与 Runner 探针；用户确认资源/启用 Docker 后验证；必要时题目允许的视频+部署说明，D1 仍不伪标通过 |
 | R3 | 代码执行失控、超时残留、测试被候选伪造 | 0–5h 首探针、24h 前完整 | 可信外部比对、容器资源/网络/路径与进程树测试；隔离失败关闭 Web 执行，禁止裸 subprocess 假装 Web 沙箱 |
 | R4 | 代码/测试/审批版本脱节，拒绝仍写入或重启重放 | 15h checkpoint、43h 提交闸口 | 不可变 revision/hash、幂等提交日志、锁与冲突检测；失配一律过期/停止，绝不静默覆盖 |
@@ -330,5 +331,5 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 待用户把关的三个决定（本轮已按推荐方案完成设计，不阻塞文档交付）：
 
 1. **运行与部署资源**：是否以当前 macOS arm64 为现场 PC，并提供有 Docker 权限的 Linux VPS/域名作为 Web；推荐容器 Runner。本机 daemon 不能用时，需明确选择先启用 Docker，还是接受只限 PC 的逐次确认有限防护模式；不默认为已授权。
-2. **模型与费用**：推荐先验证 DeepSeek `deepseek-flash`，Qwen-Plus 作备选；确认可用 Key/地域与总费用不超过 ¥50。Key 由用户在本机安全配置，不发送聊天、不写文档或 Git；公网传输仅合成/汇总班情。
+2. **模型与费用（平台已确定）**：按用户决定使用百炼及上述 endpoint，初始模型建议 `qwen-plus`，保留可配置模型 ID；本地安全配置 Key 后验证调用权限与工具协议，费用继续按不超过 ¥50 的项目预算约束。Key 不写文档或 Git；公网传输仅合成/汇总班情。
 3. **教学与发布责任**：是否认可“初二/45 分钟/循环结构”先打穿、大学配置保留，以及全部示例/参考解当前测试通过、教师审核测试规格与教学适配、最终 diff 确认后才能正式写入的闸口。测试通过不能自动批准超纲、评分与错因判断。
