@@ -87,10 +87,12 @@ SQLite 放宿主应用数据目录（Web 为专用持久卷），不暴露为模
 
 | 顺位 | 候选与模式 | 工具调用的明确依据 | 上线前仍需确认 |
 |---|---|---|---|
-| 已选平台/初始模型 | 阿里云百炼兼容 Chat Completions；初始模型建议 `qwen-plus`，关闭 thinking，模型 ID 可配置 | [Function Calling 官方文档](https://help.aliyun.com/zh/model-studio/qwen-function-calling)列出 Qwen-Plus 系列与原生工具调用协议；[调用示例](https://help.aliyun.com/zh/model-studio/model-calling-in-sub-workspace)给出用户所选 endpoint 与 `qwen-plus` | 本地安全配置凭据，实际确认账户模型权限、余额/限流、usage、工具调用往返；其他百炼模型启用前分别验证 |
+| 已选平台/初始模型 | 阿里云百炼兼容 Chat Completions；按用户要求采用旗舰档 `qwen3.8-max`，阶段 02 先关闭 thinking 验证工具协议，模型 ID 可配置 | [官方模型目录](https://help.aliyun.com/zh/model-studio/models)将该模型用于复杂推理与编程；[Function Calling 文档](https://help.aliyun.com/zh/model-studio/qwen-function-calling)列出 Qwen3.8-Max 支持原生工具调用 | 本地安全配置凭据，实际确认账户模型权限、余额/限流、usage、工具调用往返；其他百炼模型启用前分别验证 |
 | 演示降级 | `MockProvider` | 固定响应，界面、事件、导出元数据显著带 `MOCK_LLM` | 不满足 A4；Runner 仍必须真实执行，禁止 Mock 报告 |
 
 用户指定 base_url 为 `https://dashscope.aliyuncs.com/compatible-mode/v1`。阶段 02 拟用 `LLM_PROVIDER=bailian`、`DASHSCOPE_BASE_URL`、`DASHSCOPE_API_KEY`、`LLM_MODEL` 配置平台、地址、凭据和模型；不因选择模型新增一套 Agent Core，也不默认开放所有模型。只记录非敏感的配置约定，密钥不进入文档、源码或 Git；本轮不写 `.env`。模型切换仍须满足原生 tool calling、结构校验与预算要求。
+
+2026-10-29 核对的[百炼北京地域实时原价](https://help.aliyun.com/zh/model-studio/model-pricing)：`qwen3.8-max` 输入 ¥12/百万 token、输出 ¥36/百万 token。沿用单 run 与项目费用上限，不因升级旗舰模型自动扩额；账户权限、优惠与实际消耗尚未验证。
 
 不依赖“兼容 OpenAI”字样判定能力。Provider 标准接口为 `complete(messages, tool_schemas, limits) -> ModelReply(content, tool_calls[], finish_reason, usage, provider_metadata)`；保留原生 call ID 和工具/结果配对。HTTP 超时、鉴权、限流、无效 schema、截断分别返回可识别错误。SDK 或 HTTP 客户端可复用兼容协议，模型特有参数由各 Provider 管理。
 
@@ -279,9 +281,12 @@ SSE 统一字段：`event_id（session 内单调递增）、schema_version、ses
 | Docker | CLI 29.3.1，`docker info --format '{{.ServerVersion}}'` 退出 1，提示用户 socket 不存在 | daemon 当前无法连接；未启动 Docker、未拉取镜像、未跑容器 |
 | 模型凭据 | 当前进程 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY / OPENAI_API_KEY 未设置；不读取/输出密钥值 | 不能推断用户账户没有 Key；真实模型能力仍 NOT_TESTED |
 | 仓库 | 只有文档和阶段 prompts，初始 `git status --short` 均为未跟踪内容 | 没有可运行业务/测试/部署脚本；本轮不创建这些内容 |
-| 公网 | 未提供 VPS、域名、部署凭据或现存 URL | HTTPS、镜像拉取、模型出口、Runner 资源限制均未验证 |
+| 远端连接与资源（用户补充后实测） | SSH 连接成功；Ubuntu 26.04 LTS / x86_64，4 核，内存约 7.4 GiB，根盘余量约 161.1 GiB | 容量满足当前建议；连接信息与口令不记录于仓库，尚无应用部署证据 |
+| 远端运行环境 | Python 3.14.4；PATH 未发现 docker、node 命令 | 不改变项目 Python 3.12 约定；后续准备容器运行环境，不能宣称 Docker/Compose 已就绪 |
+| 远端出口 | 百炼 `/models` 未鉴权请求返回 HTTP 401，TLS 校验成功；Docker Hub registry 探测在 4 秒连接限额内超时 | 前者只证明 HTTPS 可达，不证明账户/模型可用；镜像拉取与 Runner 隔离仍未验证 |
+| 远端端口/公网应用 | 观察到 80 端口已有监听；未安装、部署、启动或重启任何服务，未提供域名 | 保留既有服务；应用入口、HTTPS、SSE 与公网 URL 必须在后续阶段实际验证 |
 
-推荐后续公网承载：独立 Linux VPS（建议至少 2 vCPU/4 GiB）、Docker Compose，HTTPS 反向代理提供静态前端与 `/api`，API/Runner 私网通信，SQLite/会话独立持久卷。运行时仅固定镜像，CPU 架构与当前 arm64 开发机不同须测试目标镜像。域名/证书、服务器地域、模型出网及费用由用户确认后再实施；本轮没有创建云资源、启动服务或部署。
+后续公网承载使用用户提供的 Linux VPS（已测资源超过建议的 2 vCPU/4 GiB），保持 Docker Compose、HTTPS 反向代理、API/Runner 私网和独立持久卷方案。当前须先准备 Docker/Compose、验证镜像获取，并安排与既有 80 端口服务共存的入口；本轮不安装或调整服务。运行时使用固定 Python 3.12 镜像，目标 x86_64 与当前 arm64 开发机不同须测试目标镜像；域名/证书、公网访问和实际隔离仍待验证。
 
 ### 9.2 实施阶段最初 5 小时必须完成的最小验证
 
@@ -319,7 +324,7 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 | 优先级 | 阻塞/当前证据 | 最晚发现点 | 处理与不可突破的底线 |
 |---|---|---|---|
 | R1 | 百炼平台与 endpoint 已确定；凭据本地配置、账户模型权限、余额和真实工具调用尚未验证 | 0–2h | 完成百炼原生 tool_calls 往返探针与预算；替换模型也做同一探针。失败明确 A4 缺口，不能用 Mock 宣称真实 Agent |
-| R2 | 无可部署 VPS/稳定入口或 Docker daemon/镜像不可用；当前本机 daemon 不可连接、无公网目标 | 0–5h | 先最小部署与 Runner 探针；用户确认资源/启用 Docker 后验证；必要时题目允许的视频+部署说明，D1 仍不伪标通过 |
+| R2 | 目标 VPS 已 SSH 验证；远端 Docker 未就绪，Docker Hub registry 连接探测超时，80 端口已有服务 | 0–5h | 后续准备 Docker/Compose 与可验证的镜像获取路径，保留既有服务，再做最小部署与 Runner 探针；未完成仍不得标 D1/隔离通过 |
 | R3 | 代码执行失控、超时残留、测试被候选伪造 | 0–5h 首探针、24h 前完整 | 可信外部比对、容器资源/网络/路径与进程树测试；隔离失败关闭 Web 执行，禁止裸 subprocess 假装 Web 沙箱 |
 | R4 | 代码/测试/审批版本脱节，拒绝仍写入或重启重放 | 15h checkpoint、43h 提交闸口 | 不可变 revision/hash、幂等提交日志、锁与冲突检测；失配一律过期/停止，绝不静默覆盖 |
 | R5 | 教育产出仅模板换词、漏测某参考解，剩余时间被界面吞掉 | 24–33h | 优先两班情/两学段对照与全产物报告；砍非 P0，保留教师审核；缺项不得通过整包导出 |
@@ -330,6 +335,6 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 
 待用户把关的三个决定（本轮已按推荐方案完成设计，不阻塞文档交付）：
 
-1. **运行与部署资源**：是否以当前 macOS arm64 为现场 PC，并提供有 Docker 权限的 Linux VPS/域名作为 Web；推荐容器 Runner。本机 daemon 不能用时，需明确选择先启用 Docker，还是接受只限 PC 的逐次确认有限防护模式；不默认为已授权。
-2. **模型与费用（平台已确定）**：按用户决定使用百炼及上述 endpoint，初始模型建议 `qwen-plus`，保留可配置模型 ID；本地安全配置 Key 后验证调用权限与工具协议，费用继续按不超过 ¥50 的项目预算约束。Key 不写文档或 Git；公网传输仅合成/汇总班情。
+1. **运行与部署资源（VPS 已提供）**：使用已只读检查的目标 VPS，按现有方案准备容器运行环境并保留既有服务；现场 PC 仍按当前 macOS arm64 方案。Docker、镜像来源和应用入口需在实施阶段验证，本轮未授权或执行安装、部署、服务调整。
+2. **模型与费用（平台/档位已确定）**：按用户决定使用百炼及上述 endpoint，默认采用旗舰档 `qwen3.8-max`，保留可配置模型 ID；本地安全配置 Key 后验证调用权限与工具协议，费用继续按不超过 ¥50 的项目预算约束。Key 不写文档或 Git；公网传输仅合成/汇总班情。
 3. **教学与发布责任**：是否认可“初二/45 分钟/循环结构”先打穿、大学配置保留，以及全部示例/参考解当前测试通过、教师审核测试规格与教学适配、最终 diff 确认后才能正式写入的闸口。测试通过不能自动批准超纲、评分与错因判断。

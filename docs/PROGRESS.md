@@ -4,11 +4,11 @@
 
 | 阶段 | 状态 | 验收证据 | 阻塞/风险 |
 |---|---|---|---|
-| 1. 设计/骨架/预部署 | IN_PROGRESS：设计已记录；骨架/部署 NOT_STARTED | PLAN、ACCEPTANCE；下列只读环境探测 | 已选百炼；凭据/调用与公网目标待验证，Docker daemon 上次探测不可连接 |
-| 2. Agent Core | NOT_STARTED | 无业务源码/测试 | 百炼安全配置及真实 Provider 探针尚未完成 |
+| 1. 设计/骨架/预部署 | PARTIAL：设计/骨架/远端临时容器验证完成 | 阶段02命令与下方证据；远端 Python 3.12 / Node 22 镜像构建及进程恢复通过 | 公网入口/HTTPS与独立 Runner 尚未交付 |
+| 2. Agent Core | Review两项缺陷已修复；针对性回归PASS | 当前62项pytest、真实百炼草稿取回；旧版本九项证据保留为历史，本轮未全量重跑 | run_python_tests 明确不可用；正式批准/提交待阶段03/05；当前完整九项复验NOT_TESTED |
 | 3. 正确性验证 | NOT_STARTED | 无真实执行报告 | 独立 Runner 与隔离尚未实现/验证 |
 | 4. 教育能力 | NOT_STARTED | 仅协议/策略与用例设计 | 尚无真实生成及两班情/两学段对照 |
-| 5. PC/Web | NOT_STARTED | 无启动/部署/导出证据 | 需要现场机器确认、VPS/域名与服务启动授权 |
+| 5. PC/Web | NOT_STARTED（启动/部署骨架已在02建立） | 本机和VPS临时容器可运行共享API与静态前端；无公网/整包证据 | 正式提交、导出、HTTPS及完整双端教育验收待实现 |
 | 6. 回归与交付 | NOT_STARTED | 未运行产品回归，未生成视频/交付链接 | 依赖前五阶段与人工教育审核 |
 
 ## 2026-10-29：执行 prompts/01-plan.md，仅架构与验收设计
@@ -45,7 +45,7 @@
 
 ### 当前 P0、风险与下一步
 
-产品没有开始实施，A–E 与故障场景全部 NOT_TESTED；不存在已通过的代码、部署或教育验证。百炼平台及 endpoint 已由用户选定；尚待验证本地凭据配置、账户模型权限与真实工具往返，另需可用的 Docker daemon/独立 Runner、VPS/域名/实际部署授权。PC 普通子进程仅有限防护，不能宣称沙箱；Web 无隔离时必须关闭执行和正式交付。
+产品没有开始实施，A–E 与故障场景全部 NOT_TESTED；不存在已通过的代码、部署或教育验证。百炼平台、旗舰模型及 endpoint 已确定，目标 VPS 已成功只读连接；尚待验证本地凭据配置、账户模型权限与真实工具往返，准备 Docker/镜像获取与应用入口。PC 普通子进程仅有限防护，不能宣称沙箱；Web 无隔离时必须关闭执行和正式交付。
 
 下一步先由用户复核 PLAN 第 12 节的运行资源、模型/费用、教学/发布闸口三个决定，再在明确的下一阶段范围内创建骨架并完成 0–5h 探针。最先打通单个累加示例的真实失败→修复→重测→拒绝/确认→本地落盘→重启恢复；不提前扩张 UI 或整套业务。本轮没有开始执行 prompts/02-agent-core.md。
 
@@ -61,3 +61,134 @@
 - 本轮仅记录非敏感决定并核对百炼官方 Function Calling/调用示例；未把用户提供的密钥写入文件、工具参数或 Git，未修改 `.env`、调用模型 API 或开发业务代码。
 - 平台选择已明确；凭据有效性、模型权限、余额与原生工具调用仍 NOT_TESTED，不能将收到凭据等同于接入完成。A4 保持 NOT_TESTED。
 - 验证：`git diff --check` 与 `python3.12 -` 内联静态检查均通过；仅上述三个文档有改动，24 项需求/23 项故障状态不变，文档未检出密钥格式值，未创建本地配置或业务目录。
+
+## 2026-10-29：旗舰模型与目标 VPS 只读检查
+
+- 用户要求更高档模型，默认模型改为百炼 `qwen3.8-max`。已核对官方目录、Function Calling 与北京地域原价（输入 ¥12/百万 token、输出 ¥36/百万 token）；仍沿用现有费用上限，未发起真实模型调用。
+- 本轮开始时工作区干净，本地已有用户提交 `b4d4e6b`，比本地记录的 origin/master 超前 1 个提交；保留该提交，不自动推送。
+- 使用用户提供的连接信息完成一次 SSH 只读探测，远端执行 `python3 -` 内联脚本，退出 0；读取系统/资源、命令存在性、监听端口，并执行无凭据的 HTTPS 可达性探测。连接口令与服务器地址不写入仓库。
+
+| 实际检查 | 结果 | 可证明的范围 |
+|---|---|---|
+| `uname -srm`、`/etc/os-release`、CPU/内存/磁盘读取 | Ubuntu 26.04 LTS，x86_64，4 核，内存约 7.4 GiB，根盘剩余约 161.1 GiB | 目标资源容量满足设计建议，不代表应用已部署 |
+| `shutil.which`、`python3 --version` | 未发现 docker/node 命令；Python 3.14.4 | Docker/Compose 执行能力尚未就绪；项目仍按 Python 3.12 实施，不改技术栈 |
+| `ss -ltn` | 80 端口已有监听 | 后续部署须保留既有服务，本轮未改端口/配置 |
+| `curl` 百炼 `/models`，未带 Key | 退出 0，HTTP 401，TLS 校验结果 0 | 只证明远端到百炼 HTTPS 可达，不证明 Key 或旗舰模型可用 |
+| `curl` Docker Hub registry `/v2/` | 退出 28，HTTP 000，4 秒连接限额超时 | 本次直连探测失败；镜像获取与隔离 Runner 尚未验证 |
+
+- 未安装软件、创建应用、部署、启动或重启服务，未修改 `.env`，未编写业务代码。初次连接命令因包含临时文件清理的 `rm -f` 被自动审核拒绝，未执行；改用不创建临时文件的 SSH 命令后完成上述检查。
+- A4、D1 与全部产品能力仍 NOT_TESTED；已收到资源与凭据不能等同于真实工具闭环、部署或隔离验收通过。
+- `git diff --check` 与 `python3.12 -` 内联静态检查通过：仅 PLAN/ACCEPTANCE/PROGRESS 变更，24 项需求及 23 项故障均保持 NOT_TESTED，未创建业务目录或本地凭据文件。按用户安排，远端整备交由其他人执行，本轮只在聊天中提供任务与验收清单，不继续操作服务器。
+
+## 2026-10-29：阶段02 — 工程骨架、真实 Agent Core 与恢复
+
+本轮按 `prompts/02-agent-core.md` 编码。开始时 PLAN/PROGRESS/ACCEPTANCE 已有用户未提交修改，全部保留；本轮不改 PLAN、AGENTS、原题和 UI 规则，不提交/推送 Git。用户自行完成本地 `.env` 配置，并授权继续检查已整备的服务器；凭据未进入源码、构建上下文或仓库文档。
+
+### 实现与文件
+
+- `pyproject.toml`、`backend/app/`：Python 3.12、FastAPI、Pydantic、SQLite；配置从本地 `.env` 读取，百炼 `qwen3.8-max` 使用原生 tool_calls，关闭 thinking。Mock 仅显式启用，不自动降级。
+- `agent.py` / `providers.py` / `tools.py`：真实模型→串行白名单工具→按原生 call_id 回传→继续推理；模型请求/工具数、主动时间、Token、单 run/会话/实例费用预留与停止，临时网络错误最多两次重试，重复无进展停止。没有可靠 usage 的请求保留未知预留，已知未发送则不计费。
+- `storage.py` / `workspaces.py`：真实读取、SQLite不可变草稿/diff/审批/消息/工具结果/预算/事件检查点；路径逐段目录句柄 + O_NOFOLLOW、硬链接/敏感文件拒绝、根目录 inode 绑定、64 KiB 限制。Web 根目录由服务端分配；PC 根目录由启动参数授权。
+- `list_files`、`read_file`、`propose_patch`、`run_python_tests`、`request_publish` 已注册。测试工具当前真实返回 `RUNNER_UNAVAILABLE / NOT_TESTED`，没有执行候选代码；正式变更只能进入待审批暂停，拒绝后可继续原批工具，批准返回 `PUBLISH_NOT_READY`。正式文件不变。
+- `api.py` / `launch.py`：会话归属 cookie、Host/Origin 与 PC 能力口令检查；SSE先落库后发送，游标补发；幂等请求、单会话活动 run、实例串行执行。重启后 READY/RUNNING 变 INTERRUPTED，预算保留；等待审批保持暂停，不自动重放写操作。
+- `frontend/src/`：React/TS/Vite/Tailwind/Lucide 最小教师工作台，历史/聊天/文件/草稿diff/执行事件/失败/继续/拒绝入口；浅紫白色沿用现有规范。执行未接通与 Mock 显著标识；完成 `web-design-guidelines` 源码检查，修正上下文回显、空/加载状态、旧快照覆盖和键盘焦点/语义标题。
+- `scripts/start-desktop.sh`、`scripts/smoke_startup.py`、`scripts/probe_provider.py`、`scripts/probe_remote.py`、`Dockerfile`、`README.md`：PC一条启动命令、同源静态前端、远端临时容器探针；没有启动浏览器，没有公网发布或改已有服务。
+
+### 实际命令与结果
+
+命令均在仓库根目录运行。源码指纹（后端/前端/脚本/构建配置与种子，不含凭据/文档/依赖产物）：`bca61b9f476cd5acfad689bfc2a3ac3f41fd04135204e0b6aae8c60780be55fd`；可复查于 `.runtime/source-sha256.txt`。运行证据目录已被 Git 忽略。
+
+| 实际命令 | 结果与证据 | 验收边界 |
+|---|---|---|
+| `uv venv --python python3.12 .venv`；`uv pip install --python .venv/bin/python --default-index https://pypi.org/simple -e '.[dev]'` | PASS；Python 3.12.14；依赖安装成功 | 只安装项目虚拟环境，未改系统解释器/全局源 |
+| `npm --prefix frontend install --package-lock=false --registry=https://registry.npmjs.org --prefer-offline --fetch-retries=1 --fetch-timeout=30000 --no-fund` | PASS；39项审计，最终0个已知漏洞 | 未生成仓库锁文件；不表示未知风险为零 |
+| `.venv/bin/python -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/unit/test_provider.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_api.py -q` | PASS；**51 passed**，1条Starlette TestClient未来弃用警告 | 模型为显式测试Mock/HTTP契约桩，不消费Key；覆盖真实文件/SQLite、预算、错误、权限、恢复与SSE |
+| `.venv/bin/ruff check backend scripts`；`git diff --check` | PASS | 仅本轮代码/相关diff检查 |
+| `npm --prefix frontend run build` | PASS；TypeScript + Vite 7.3.7；1580 modules；JS `index-6QFvVWe9.js` / CSS `index-CTLBFxWQ.css` | 编译成功，未执行浏览器渲染/交互 |
+| `.venv/bin/python scripts/probe_provider.py`（首轮PC） | PASS；真实百炼原生 list/read/propose；随机文件标记进入工具结果、草稿及最终回复，第二轮正确复述；正式文件未创建；5次请求，usage输入8267/输出575，估算¥0.119904；`.runtime/probe-provider.json` | 真实API，不是Mock；不是代码验证或完整教案 |
+| `.venv/bin/python scripts/probe_provider.py --mode web`；随后 `--mode web --resume <探针session_id>` | 首次 FAIL（PROVIDER_PROTOCOL），同一检查点继续后 PASS；真实 list/read/propose与第二轮通过，未重复创建草稿；`.runtime/probe-provider-web.json` 保存工具、事件、usage和 recovered_errors | 失败没有抹除或切Mock；合计估算/预留¥0.338520，含一次用量未知的保守预留 |
+| `.venv/bin/python scripts/smoke_startup.py` | PASS；`.runtime/smoke-startup.json` / `.runtime/smoke-startup.log`：实际启停PC/Web进程、HTTP健康/前端、无本机口令拒绝、工具真实读取、重启恢复消息/草稿/审批/usage、拒绝后继续无重复、SSE回放、缺Key真实报错 | LLM显式Mock；故障分支为真实Bailian Provider缺Key，不发网络；不启动浏览器 |
+| `bash scripts/start-desktop.sh --workspace <仓库外临时教师目录> --no-browser --port <随机空闲端口>` | PASS；真实启动shell入口，HTTP健康检查200，随后正常停止 | 合成临时目录、LLM显式Mock，不打开浏览器 |
+| `.venv/bin/python scripts/probe_remote.py <SSH目标> --pypi-index https://mirrors.cloud.tencent.com/pypi/simple` | PASS；远端Docker 29.9.2 / Compose 5.6.1，Python 3.12.16 x86_64 + Node22多阶段构建；同一启动/恢复探针全部通过，最终临时镜像 manifest `sha256:93dcdb6b1e848fe021596916e864b554e71450d11a3935cb7540e41f4b528fa0`；命令输出保存在本会话 | 容器非root、只读根、无外网、无Socket、无宿主挂载、无发布端口；这是应用启动测试，**不是候选代码Runner隔离验收** |
+
+真实API本轮累计估算/未知用量预留 **¥0.458424**，未知预留1笔；不是账单精确实耗。探针与应用共用SQLite预算，恢复不清零。临时远端容器、应用镜像标签和源码目录由脚本清理；基础镜像/构建缓存保留，未安装宿主Python/Node、未改80端口服务。
+
+### 排错与修复记录
+
+- 本机清华PyPI源403：本次命令显式使用官方源；没有修改全局配置。
+- npm元数据下载缓慢、镜像Babel版本不一致：移除非必要Babel插件，使用Vite内置JSX；刷新官方元数据并固定直接依赖。根据[Vite官方公告](https://github.com/vitejs/vite/security/advisories/GHSA-9jrq-w75r-8gcw)选7.3.7，并按[esbuild](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)/[source-map-js](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)公告固定修复版覆盖，最终安装审计0告警，实际重新构建通过；未运行 `audit fix --force`。
+- 单测首次41通过/1失败：默认未知输出预留4096×3会先触发12k预算，符合预算优先；重试专项以每次1000预留验证确实最多重试2次，保留原断言3次请求，不放宽生产限额。
+- 真实Web探针收到一次不合协议响应：明确失败且不执行其操作；保存原生call/result与预算，从同一会话继续成功。原始HTTP body未保存，具体缺失字段无法追溯；已增加只含字段名/异常类型的脱敏诊断，未伪称查明厂商内部原因。
+- 远端官方PyPI索引/文件下载先报不可解析、长时间回溯，固定直接依赖后定位为 `files.pythonhosted.org` 读取超时。容器内实测三个镜像均有目标版本，腾讯源0.06秒；构建参数显式切该源后依赖约9秒安装成功，再实际启动通过。未更改远端pip/Docker全局配置。
+
+### 未完成与下一步
+
+- 阶段03：独立Runner、真实Python执行/固定用例/失败定位/自动修复及隔离清理仍 NOT_TESTED；当前接口显式关闭执行。
+- 阶段04/05：结构化教育产物、班情导入/策略、完整种子、逐项版本回退、正式提交/导出尚未实现；本阶段批准写入被后端阻断。
+- 公网HTTPS URL、反向代理、真实浏览器/Playwright及教师教育审查 NOT_TESTED；未启动浏览器符合AGENTS限制。README已给PC/服务启动与手动检查步骤。
+- 长上下文仅做完整教师轮次边界的历史索引，原始消息留库；教育事实的语义压缩仍待后续结构模型，不承诺无限上下文。只支持单API worker；依赖树未锁定，正式交付前另行固定与回归。下一步进入阶段03，不跨阶段扩张UI。
+
+## 2026-10-29：阶段02专项验收 — 九项复验全部PASS
+
+本次仅验收阶段02并修复该范围内缺陷，没有实现后续教育业务、Runner、正式提交或公网发布。前述实施记录保留为历史；本次源码指纹为 `20b2a2bf7f7e37b786befd0a5a603a2530a3298226343e4a7e180fdd89c25b47`。
+
+### 实际修复与验收入口
+
+- 真实复现文件列举缺陷：201个文件位于子目录时，`WORKSPACE_TOO_LARGE`被父层捕获，静默返回200个文件；恰好200个合法文件后出现不支持扩展名时，又会误报超限。新增两项断言先实际得到2 FAIL，再在 `backend/app/workspaces.py` 精确修复计数位置与错误传播；未放宽200文件限额。`test_policy.py`修复后19 PASS，相关完整回归53 PASS。
+- 新增 `scripts/verify_stage02.py`：通过真实FastAPI HTTP接口分别运行PC/Web会话，固定`LLM_PROVIDER=bailian`；随机字段只在实际fixture中，未放进教师请求。检验原生调用、真实读取hash、匹配call_id的工具消息、后续模型草稿/最终回复、SIGKILL与重新启动、七类快照一致、拒绝后的真实模型继续、无重复草稿/工具结果。
+- `scripts/probe_remote.py --real-startup`：不上传Key，在远端临时容器内用真实Provider配置检验API/前端HTML与全部入口JS/CSS，保存构建镜像ID、源码归档hash和运行结果；此路径不调用远端模型，不以Mock证明启动。
+- 负向网络探针初次被现有HTTP代理转为502，服务实际上已明确返回`PROVIDER_HTTP_ERROR`，没有降级Mock。修正探针子进程的`NO_PROXY`后，在不监听的本机绑定端口真实触发连接拒绝，保持原`PROVIDER_UNAVAILABLE`断言。验收脚本也补了中间报告落盘；未修改模型/代理的产品逻辑或全局环境。
+
+### 本次实际命令与结果
+
+| 命令/操作 | 实际结果 |
+|---|---|
+| `npm --prefix frontend run build` | PASS；TypeScript + Vite 7.3.7，1580 modules；JS `index-6QFvVWe9.js`、CSS `index-CTLBFxWQ.css` |
+| `.venv/bin/python -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/unit/test_provider.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_api.py -q` | PASS；**53 passed**，1条既有TestClient未来弃用警告；这些离线测试中的Mock/HTTP桩只作补充，不是下列真实能力的依据 |
+| `.venv/bin/ruff check backend scripts` | PASS |
+| `.venv/bin/python scripts/verify_stage02.py` | PASS；PC/Web真实HTTP、qwen3.8-max共12次成功请求、原生工具8条、强制重启恢复、真实连接拒绝报错；全部`mock=false` |
+| `npm --prefix frontend run dev -- --port <随机空闲端口> --strictPort` | PASS；实际启动Vite，`/`、`/@vite/client`、`/src/main.tsx`均HTTP200，随后停止 |
+| `bash scripts/start-desktop.sh --workspace <临时教师目录> --no-browser --port <随机空闲端口>` | PASS；实际启动PC入口，健康200、runtime为`pc / bailian / mock=false`，随后停止 |
+| `.venv/bin/python scripts/probe_remote.py <SSH目标> --pypi-index https://mirrors.cloud.tencent.com/pypi/simple --real-startup` | PASS；当前源码多阶段Docker构建、非root容器API与JS/CSS HTTP200；Python3.12.16 / Linux x86_64，Docker29.9.2 / Compose5.6.1；未公开端口，容器/本次镜像/源码已清理 |
+| 远端Python3.12容器实际请求百炼`/compatible-mode/v1/models`，未附Key | HTTPS/TLS验证成功，HTTP401；证明出口可达，不冒充鉴权成功或远端模型调用 |
+
+### 证据与逐项判定
+
+- [九项汇总](../.runtime/stage02-acceptance-summary.json)：9 PASS，当前无活动验收run，浏览器/公网URL明确未测。账本累计估算及保守预留¥1.390224，包含此前运行和负向探针预留，不是精确账单。
+- [本机真实HTTP/模型/恢复报告](../.runtime/stage02-acceptance-52c404a1a3e2.json)：实际`provider_request_id`/usage/模型名、原生call/result、fixture hash、快照与失败状态。PC读取call `call_6c383f86ba144b659c1e9672`；Web读取call `call_cf2ab342bb14469380ffb58d`。PC进程33666→33737，Web进程33762→33904；SIGKILL前后session/messages/runs/tool_calls/drafts/approvals/usage逐项一致，之后真实模型复述随机字段，草稿和结果未重复。
+- [Vite与PC入口](../.runtime/stage02-entrypoints.json)及`.runtime/stage02-entrypoints.log`：真实进程HTTP状态记录。
+- [远端运行报告](../.runtime/stage02-remote-425f17b3c9ff4c669f853788a76c7efc.json)：镜像ID `sha256:f2023b250e3d1d16dfe40f72fe2e16e336eeb083182ff0bf3cfd7d8769041b2a`；运行时`mock=false`，未传Key/未调远端模型/未发布端口。
+
+用户九项要求逐项结果见 ACCEPTANCE 第7节，均有本次执行证据。首次探针已完成PC/Web真实链路，但未落最终报告；本次修正验收脚本后完整重跑，以上使用第二次完整保存的报告，所有调用成本仍留在原SQLite预算中，没有通过换库清零。
+
+浏览器渲染/Playwright、公网HTTPS和真实Python Runner仍 NOT_TESTED，未把它们计入上述PASS。未修改`.env`、锁文件、系统/服务器全局配置或用户原有PLAN修改；未Git提交或推送。
+
+## 2026-10-29：阶段02 Review — 仅修复P1草稿取回与P2工具超时
+
+本轮只修改 `backend/app/agent.py`、`tools.py`、`domain.py` 及相关回归测试、PROGRESS/ACCEPTANCE。保留已有未提交内容；没有前端/教育业务/Runner/发布功能变更，没有改配置、依赖或提交Git。当前验证对应文件hash见[本轮汇总](../.runtime/stage02-review-summary.json)；前面的九项验收对应历史源码，不能直接作为当前版本全量PASS。
+
+### P1：长上下文后的草稿正文不可取回 — PASS
+
+- 根因：36,000字节以上历史按完整轮次裁剪，正文只留SQLite，索引只有ID/path/hash；`read_file`仅读正式文件，模型无取回草稿正文的工具。
+- 最小修复：注册L0只读 `read_draft(draft_id)`，复用服务端会话归属校验，返回完整正文与版本/base_hash；裁剪索引提示使用它。参数仍严格校验，无法传另一个session_id伪造归属，不改变草稿/正式文件。
+- 回归：PC/Web各建立约20KB真实SQLite草稿，确实形成超过36,000字节历史；关闭旧Store并重开后新轮上下文无正文标记，按索引ID读取草稿，逐字节断言完整正文，然后保留原稿追加说明，核对父版本与正式文件未改变。另验证跨会话读取被拒、正文不泄露、额外参数被拒。测试Provider为显式协议桩，不冒充真实模型。
+- 额外真实API：[百炼专项报告](../.runtime/stage02-review-live-draft.json)。测试夹具为直接准备的合成草稿/历史，明确不是模型生成；历史40,214字节，存储关闭重开，裁剪输入中无随机标记。真实 `qwen3.8-max` 原生调用 `read_draft`，工具返回完整正文与预期一致，最终回复包含仅在正文末尾的随机标记；实际usage估算¥0.075060。该探针只证明真实取回；保留全文续改由上述完整正文回归验证。
+
+### P2：声明超时未生效，文件操作阻塞事件循环 — PASS
+
+- 根因：Loop在SQLite事务内同步调用整个handler；5秒声明没有用于调度，主动时间也等返回后才增加，取消无法及时执行。
+- 最小修复：文件列举/读取及diff改为后台只读准备，等待时不持有SQLite事务；采用 `min(工具超时, run剩余主动时间)` 限时并提前持久化次数/时间预留。只有仍处于RUNNING/PENDING的调用，才在主循环原子保存草稿/审批/工具结果；超时报TOOL_TIMEOUT并使run失败，run时间耗尽则TIME_BUDGET停止。超时/取消后不执行准备结果的落库阶段。
+- 回归：生产默认5秒限额下真实读取注入5.1秒延迟，5.006622秒进入FAILED/TOOL_TIMEOUT，10ms心跳在0.013895秒触发；80ms剩余预算同样限制文件工具。分别检查迟到的草稿与审批准备不能写库、不能把超时结果改成成功；ASGI实际健康/取消路由在读取未结束时响应，健康0.001185/0.000815秒，取消0.001291秒，迟到返回后结果不变。这些是测试环境数据，不是生产延迟承诺。
+- 边界：Python无法强杀已进入底层阻塞I/O的线程；该只读操作可能在后台继续，但其迟到结果被丢弃，不能追加草稿/审批或覆盖终态。本轮没有引入子进程执行器或扩大到阶段03。
+
+### 实际命令与证据
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/unit/test_provider.py backend/tests/unit/test_tool_timeouts.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_api.py -q --junitxml=.runtime/stage02-review-tests.xml -o junit_family=xunit1
+.venv/bin/ruff check backend/app backend/tests
+git diff --check
+```
+
+结果：**62 passed**，1条既有Starlette TestClient未来弃用警告；ruff和空白检查通过。新增9个回归案例，修复前已实际复现6个FAIL（P1两端2个、P2四个），保留断言后通过。完整测试与计时属性见[JUnit报告](../.runtime/stage02-review-tests.xml)，真实API命令和脱敏结果见本会话及专项JSON；没有把合成历史或协议桩计作真实API证据。
+
+当前完整九项HTTP/PC/Web/远端验收、浏览器、前端构建、隔离Runner均未在本轮重跑，保持NOT_TESTED；本次结论仅覆盖两项修复及相关后端回归。无需为纯后端修复重新做前端/部署工作。
