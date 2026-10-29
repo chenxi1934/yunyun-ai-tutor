@@ -5,6 +5,10 @@ from pathlib import Path, PurePosixPath
 from app.domain import AppError, sha
 
 
+def is_python_path(path: str) -> bool:
+    return PurePosixPath(path).suffix.lower() == ".py"
+
+
 class Workspace:
     """所有用户文件读取使用目录句柄逐段打开，拒绝链接和私有路径。"""
 

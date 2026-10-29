@@ -1,3 +1,4 @@
+import asyncio
 import difflib
 from dataclasses import dataclass
 
@@ -5,6 +6,7 @@ from pydantic import ValidationError
 
 from app.domain import (
     AppError,
+    GetVerification,
     ListFiles,
     ProposePatch,
     ReadDraft,
@@ -18,7 +20,8 @@ from app.domain import (
     uid,
 )
 from app.storage import Store
-from app.workspaces import Workspace
+from app.verification.service import VerificationService
+from app.workspaces import Workspace, is_python_path
 
 
 @dataclass(frozen=True)
@@ -39,11 +42,14 @@ SPECS = (
     ToolSpec("read_draft", "按草稿ID读取当前会话的持久化草稿正文和版本。"
              "续改草稿或历史裁剪后使用本工具；read_file只读取正式文件。", ReadDraft, "L0"),
     ToolSpec("propose_patch", "提出文件完整新内容或删除草稿，base_hash 须匹配实际文件；"
-             "新建用 null。仅保存草稿，不改正式文件。", ProposePatch, "L1"),
-    ToolSpec("run_python_tests", "请求执行某草稿的固定版本测试。阶段02执行器尚未接通，"
-             "会明确返回 NOT_TESTED；禁止自报通过。", RunPythonTests, "L2"),
+             "base_hash是正式文件Hash，不是草稿content_hash；新建文件未落盘时，首次和续改都用null。"
+             "仅保存草稿，不改正式文件。", ProposePatch, "L1"),
+    ToolSpec("get_verification", "读取代码草稿的冻结测试规格与真实验证报告。先读取规格再测试；不能修改测试。",
+             GetVerification, "L0"),
+    ToolSpec("run_python_tests", "真实执行最新Python草稿及教师冻结的测试规格；失败返回逐用例日志。"
+             "只允许修复代码，不能改测试；最多两次修复。", RunPythonTests, "L2", timeout_seconds=35),
     ToolSpec("request_publish", "为草稿创建正式变更待审批并暂停；此工具不能批准或写入。"
-             "阶段02正式提交尚未开放。", RequestPublish, "L3"),
+             "正式提交尚未开放。", RequestPublish, "L3"),
 )
 
 
@@ -53,8 +59,9 @@ def schemas() -> list[dict]:
 
 
 class Registry:
-    def __init__(self, store: Store):
+    def __init__(self, store: Store, verification: VerificationService | None = None):
         self.store = store
+        self.verification = verification
 
     @staticmethod
     def timeout_seconds(name: str) -> float:
@@ -86,6 +93,39 @@ class Registry:
     def _diff(path: str, original: str, content: str) -> str:
         return "".join(difflib.unified_diff(original.splitlines(keepends=True),
                        content.splitlines(keepends=True), fromfile=path, tofile=path + "（草稿）"))
+
+    def begin(self, call, session):
+        if call["name"] != "run_python_tests" or not self.verification:
+            return
+        try:
+            _, args = self._arguments(call, session)
+            draft = self.verification.draft(session["id"], args.draft_id)
+        except (AppError, ValidationError):
+            return
+        self.verification.invalidate(session["id"], draft["path"])
+        draft["verification_status"], draft["status"] = "NOT_TESTED", "DRAFT"
+        self.store.put("drafts", draft)
+        self.store.event(session["id"], call["run_id"], "verification.started",
+                         {"draft_id": draft["id"]})
+
+    async def prepare_async(self, call, session, workspace):
+        try:
+            spec, args = self._arguments(call, session)
+            if spec.name in {"run_python_tests", "get_verification", "request_publish"} and self.verification:
+                if spec.name == "run_python_tests":
+                    return {"report": await self.verification.prepare(
+                        session["id"], args.draft_id, args.test_spec_revision)}
+                try:
+                    identity = await self.verification.runner.identity()
+                except AppError:
+                    identity = None
+                # 只读准备，状态刷新在主循环提交阶段进行。
+                prepared = await asyncio.to_thread(self.prepare, call, session, workspace)
+                prepared["runner_identity"] = identity
+                return prepared
+            return await asyncio.to_thread(self.prepare, call, session, workspace)
+        except (AppError, ValidationError) as error:
+            return {"error_result": self.error_result(call, error)}
 
     def prepare(self, call: dict, session: dict, workspace: Workspace) -> dict:
         """后台只读准备；不写草稿/审批/事件，超时或取消后可安全丢弃结果。"""
@@ -123,6 +163,15 @@ class Registry:
 
     def _handle(self, name, args, call: dict, session: dict, ws: Workspace, prepared=None) -> dict:
         sid, rid = session["id"], call["run_id"]
+        if self.verification and prepared and "runner_identity" in prepared:
+            self.verification.refresh(sid, prepared["runner_identity"])
+        if name == "get_verification":
+            draft = self.verification.draft(sid, args.draft_id)
+            spec = self.verification.latest_spec(sid, draft["path"])
+            return {"draft_id": draft["id"], "verification_status": draft["verification_status"],
+                    "test_spec": spec, "reports": [r for r in self.store.find("reports", sid)
+                                                    if r["draft_id"] == draft["id"]]}
+
         if name == "list_files":
             return prepared if prepared is not None else {"files": ws.list_files()}
         if name == "read_file":
@@ -150,6 +199,10 @@ class Registry:
                      "mock": session["mock"], "created_at": now(),
                      "diff": prepared["diff"] if prepared is not None else self._diff(
                          args.path, original["content"], args.content)}
+            if self.verification:
+                self.verification.repair_guard(sid, args.path, draft["content_hash"])
+                self.verification.invalidate(sid, args.path)
+            draft["repair_diff"] = self._diff(args.path, existing[-1]["content"], args.content) if existing and is_python_path(args.path) else None
             self.store.put("drafts", draft)
             self.store.event(sid, rid, "artifact.revised", {"draft_id": draft["id"],
                              "path": draft["path"], "revision": draft["revision"],
@@ -158,11 +211,9 @@ class Registry:
                     "content_hash": draft["content_hash"], "status": "DRAFT",
                     "verification_status": "NOT_TESTED", "formal_file_changed": False}
         if name == "run_python_tests":
-            draft = self._draft(args.draft_id, sid)
-            if not draft["path"].endswith(".py") or draft["operation"] != "write":
-                raise AppError("NOT_PYTHON_DRAFT", "只能验证 Python 代码草稿。", 422)
-            raise AppError("RUNNER_UNAVAILABLE", "NOT_TESTED：隔离执行器将在阶段03接入；"
-                           "本次未运行代码，不存在通过报告。", 503)
+            if not self.verification or not prepared or "report" not in prepared:
+                raise AppError("RUNNER_UNAVAILABLE", "NOT_TESTED：隔离执行器不可用。", 503)
+            return self.verification.commit(prepared["report"])
         if name == "request_publish":
             draft = self._draft(args.draft_id, sid)
             current = prepared["file"] if prepared is not None else ws.read(draft["path"], allow_missing=True)
@@ -171,6 +222,10 @@ class Registry:
             latest = [d for d in self.store.find("drafts", sid) if d["path"] == draft["path"]][-1]
             if latest["id"] != draft["id"]:
                 raise AppError("STALE_DRAFT", "已有新草稿，请审核最新版本。", 409)
+            if any(is_python_path(d["path"]) for d in self.store.find("drafts", sid)):
+                self.verification.delivery_candidates(sid)
+                if is_python_path(draft["path"]) and not self.verification.current_pass(draft):
+                    raise AppError("VERIFICATION_REQUIRED", "代码尚未通过当前规格，不能审核交付。", 409)
             approval = {"id": uid(), "session_id": sid, "run_id": rid, "call_id": call["id"],
                         "draft_id": draft["id"], "status": "PENDING", "created_at": now(),
                         "content_hash": draft["content_hash"], "base_hash": draft["base_hash"]}

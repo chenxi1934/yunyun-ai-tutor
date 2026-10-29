@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     yunyun_local_token: SecretStr = SecretStr("")
     yunyun_hosts: str = "localhost,127.0.0.1,testserver"
     yunyun_secure_cookie: bool = False
+    runner_socket: Path | None = None
+    runner_token: SecretStr = SecretStr("")
     max_steps: int = Field(default=12, ge=1, le=12)
     max_tools: int = Field(default=24, ge=1, le=24)
     max_active_seconds: float = Field(default=720, gt=0, le=720)

@@ -1,8 +1,8 @@
 # P0 与交付验收矩阵
 
-**修订日期：2026-10-29。本轮仅定义验收，尚无业务实现，以下功能均为 NOT_TESTED。**
+**修订日期：2026-10-29。阶段03验证闭环已实现；首次执行证据见第9节，对抗性复验见第10节，当前P1修复见第11节。原题完整教育/发布能力未覆盖部分继续为 NOT_TESTED。**
 
-架构、协议、阶段和部署闸口见 [PLAN.md](PLAN.md)，实际执行记录见 [PROGRESS.md](PROGRESS.md)。本轮文档/环境检查不能充当产品能力证据。
+架构、协议、阶段和部署闸口见 [PLAN.md](PLAN.md)，实际执行记录见 [PROGRESS.md](PROGRESS.md)。历史文档/环境检查不能充当产品能力证据；各阶段证据仅适用于其记录的源码与范围。
 
 ## 1. 判定纪律与证据格式
 
@@ -15,17 +15,17 @@
 
 ## 2. 逐条原题验收
 
-下表“方法”均是未来实施后的验收入口，尚未运行。Fxx 故障场景见第 3 节，M-PC/M-WEB 见第 4 节；确切测试文件名和阶段命令见 PLAN 第 10 节。
+下表按完整原题判定；局部通过的证据在末列和各阶段子验收中注明。Fxx 故障场景见第 3 节，M-PC/M-WEB 见第 4 节；确切测试文件名和阶段命令见 PLAN 第 10 节。
 
 | ID | 原题锚点/要求 | 可观察的 PASS 标准 | 方法 | 状态 | 实际证据 |
 |---|---|---|---|---|---|
 | A1 | A1，自然语言工作区读写与可感知变更 | 一句话使真实模型返回原生 tool_calls，实际 list/read；读到随机文件内容后据此提出草稿；界面有真实新文件/diff，可续改，正式文件未经确认不变 | Provider 探针、F21、M-PC、M-WEB | NOT_TESTED | 阶段02 PC/Web真实API子链路PASS；草稿/diff已保存，浏览器呈现与完整审批待阶段05 |
-| A2 | A2，真实代码运行 | 候选 Python 确实执行；stdout/stderr/exit_code/耗时与实际一致；错误代码/异常/死循环明确失败并定位，非候选自报 PASS | F01–F06；Runner 集成测试 | NOT_TESTED | 无 |
-| A3 | A3，多轮与会话恢复 | 第二轮能引用上一轮班情/修改；关闭后端再启动可恢复消息、草稿、工具结果、冻结用例、报告、待审批与预算；不会重复写/删 | F09、F11、F17；恢复集成测试 | NOT_TESTED | 阶段02实际进程重启恢复消息/草稿/工具/审批/预算PASS；冻结测试、报告、正式提交恢复尚未实现 |
+| A2 | A2，真实代码运行 | 候选 Python 确实执行；stdout/stderr/exit_code/耗时与实际一致；错误代码/异常/死循环明确失败并定位，非候选自报 PASS | F01–F06；Runner 集成测试 | PASS | 阶段03：PC共享核心真实容器回归19 PASS；Web真实百炼错误报告→修复→同规格重测通过；逐用例stdout/stderr/退出码/耗时/证据见第9节 |
+| A3 | A3，多轮与会话恢复 | 第二轮能引用上一轮班情/修改；关闭后端再启动可恢复消息、草稿、工具结果、冻结用例、报告、待审批与预算；不会重复写/删 | F09、F11、F17；恢复集成测试 | NOT_TESTED | 阶段02实际进程重启恢复消息/草稿/工具/审批/预算PASS；阶段03规格/报告入SQLite，修复额度重开存储保持；正式提交及全链路进程恢复仍待验收 |
 | A4 | A4，至少一个真实 API；允许 Mock 兜底 | 一家实际账户 API 完成“模型 call → 工具真执行 → call_id 回传 → 模型使用结果”；留脱敏请求/响应、实际 model/usage；Mock 时界面/事件/导出均醒目标识 | Provider 探针、F16、F21 | NOT_TESTED | 真实百炼qwen3.8-max原生工具往返及两轮上下文PASS，PC/Web均有证据；Mock事件/API标识已测、UI已构建，浏览器与导出标识尚未验收，故整项不提前PASS |
-| A5 | A5，明确权限分级 | 授权读/草稿/受限测试可按 Policy 执行；正式创建/覆盖/删除展示具体 diff 并需教师确认；模型和直接 API 均不能伪造批准，路径越界被拒 | F10、F12–F15；Policy/提交测试 | NOT_TESTED | 读/草稿/路径拒绝/待审批/拒绝恢复子项PASS；受限执行及正式提交待阶段03/05 |
+| A5 | A5，明确权限分级 | 授权读/草稿/受限测试可按 Policy 执行；正式创建/覆盖/删除展示具体 diff 并需教师确认；模型和直接 API 均不能伪造批准，路径越界被拒 | F10、F12–F15；Policy/提交测试 | NOT_TESTED | 读/草稿/路径拒绝/待审批/拒绝恢复子项PASS；阶段03受限执行已验证；正式提交待阶段05 |
 | B1 | B1，结构化可复用备课产出 | Pydantic 校验 JSON；有稳定 ID 的目标/环节/时间，合计 45 分钟；2–3 个示例；基础/进阶/挑战各 1 题，均含参考解、用例与合计 100 的评分点；JSON/Markdown 导出一致 | 教育单测、M-PC、M-WEB、F20 | NOT_TESTED | 无 |
-| B2 | B2，所有代码真正通过用例才可交付 | manifest 的每个示例和参考解均有当前指纹下的完整成功报告，逐 case 输入/预期/实际可查；任一错误或漏测阻断交付；模型至多修复两次且不改保护用例 | F01–F08、F20；真实完整教案生成 | NOT_TESTED | 无 |
+| B2 | B2，所有代码真正通过用例才可交付 | manifest 的每个示例和参考解均有当前指纹下的完整成功报告，逐 case 输入/预期/实际可查；任一错误或漏测阻断交付；模型至多修复两次且不改保护用例 | F01–F08、F20；真实完整教案生成 | NOT_TESTED | 阶段03已实现逐代码验证、失败/漏测阻断及两次修复；完整教育manifest和三档题待阶段04/05，不能以工程夹具替代 |
 | B3 | B1/B2，逐项接受/拒绝/继续编辑与回退 | 教案段落、示例、题目有独立 revision/审批；拒绝后正式文件字节不变并可恢复候选父版本；已发布版本可转成恢复草稿，重测/审批后回写；代码编辑立即使旧验证过期 | F07、F10、F11、F13、F23 | NOT_TESTED | 无 |
 | B4 | B3，错因预警贴合班情 | 每条有 misconception_type、evidence/未知项、trigger、cause、teaching_intervention、exercise_ids 与学段；“死循环 3 人”推动具体追踪干预；无证据结论标预测，不能泛化为能力差 | F18、F19；策略单测及教师内容审查 | NOT_TESTED | 无 |
 | B5 | B4，初中/大学学段实质适配 | 固定主题与班情切换学段，至少目标、示例/练习、评分点三处实质变化；初中先修/超纲规则生效，大学增加推理/复杂度；两端均可配置 | F19；对照 JSON 与教师审查 | NOT_TESTED | 无 |
@@ -46,14 +46,14 @@
 
 ## 3. 故障、边界与工程闸口
 
-每项故障验收的 PASS 指“系统正确识别并阻断该故障”，不能把故障程序自己的报告改成 PASS。下列场景也均未执行。
+每项故障验收的 PASS 指“系统正确识别并阻断该故障”，不能把故障程序自己的报告改成 PASS。各场景的完整判定与阶段03子覆盖范围见实际证据列和第9节。
 
 | ID | 场景与观测断言 | 拟验证位置 | 状态 | 实际证据 |
 |---|---|---|---|---|
 | F01 | 所有正确示例与三档参考解真实执行，所需 case_id 全覆盖；报告逐项对应，不能复用一个报告充数 | Runner/完整产物集成 | NOT_TESTED | 无 |
 | F02 | `sum_1_to_n` 用 n=0/1/5；故意 `range(1,n)` 得到错误结果，定位 artifact/case/expected/actual；真实模型依据失败修代码后在同一规格通过 | Runner + 真实 API 探针扩展 | NOT_TESTED | 无 |
 | F03 | 故意缺冒号触发 SYNTAX_ERROR，展示 stderr 与退出码；UI 不显示验证通过/可发布 | Runner/前端状态 | NOT_TESTED | 无 |
-| F04 | 除零等触发 RUNTIME_ERROR；正常退出但答案错触发 OUTPUT_MISMATCH，二者区分 | Runner | NOT_TESTED | 无 |
+| F04 | 除零等触发 RUNTIME_ERROR；正常退出但答案错触发 OUTPUT_MISMATCH，二者区分 | Runner | PASS | 阶段03真实容器覆盖：除零RUNTIME_ERROR、正常退出错误输出OUTPUT_MISMATCH、AssertionError单列；第9节 |
 | F05 | `while True` 在 2 秒墙钟限额及有界清理时间内终止；带派生进程用例也无残留容器/进程；状态 TIMEOUT，拒绝/取消/Manager 重启也能清理 | 真容器集成、进程/作业查询 | NOT_TESTED | 无 |
 | F06 | 过量内存/进程/输出触发 RESOURCE_LIMIT 或 OUTPUT_LIMIT；Runner 不崩溃、不影响下一作业；stdout/stderr 各 64 KiB 上限生效 | 真容器集成 | NOT_TESTED | 无 |
 | F07 | 分别修改代码、expected、运行镜像或 Runner Policy，旧报告 STALE，旧审批失效，提交/导出被拒；教学语义变化也使相关审核过期 | 验证/发布集成 | NOT_TESTED | 无 |
@@ -97,7 +97,7 @@
 
 ## 5. 当前结论
 
-阶段02 Review确认的P1/P2已修复，当前针对性结果见第8节；第7节九项证据属于历史源码，本轮没有完整重跑。原题A–E共24项仍为 NOT_TESTED（多项已部分通过），故障F21为 PASS，其余22项保留 NOT_TESTED，不能用局部工程测试冒充完整教育/发布/隔离能力。具体命令、故障排查、用量与证据位置见 [PROGRESS.md](PROGRESS.md)。
+阶段03当前P1修复验证见第11节，对抗性验收见第10节，首次实施结果见第9节，阶段02历史结果见第6–8节。原题A2真实代码运行已PASS；完整教育结构、发布/导出、公网URL与浏览器交互仍未覆盖。故障F04和F21已有对应证据，其余故障按完整标准保留NOT_TESTED；第9节明确列出本轮实际覆盖，不能将部分覆盖冒充完整产品验收。具体命令、故障排查、用量与证据位置见 [PROGRESS.md](PROGRESS.md)。
 
 ## 6. 阶段02实施时子验收（2026-10-29，历史记录）
 
@@ -156,3 +156,87 @@
 | 当前版本完整九项/远端/浏览器/前端构建重新验收 | NOT_TESTED | 本轮仅按确认问题做后端修复及相关验证，没有扩张验证范围；第6/7节保留历史证据，不冒充本轮重跑 |
 
 后台只读I/O线程不能被Python强杀，可能晚于超时/取消结束；已验证迟到结果被丢弃且无草稿/审批副作用。Runner、正式提交、教育业务仍属于后续阶段，未新增实现。
+
+## 9. 阶段03 — 首次验证闭环验收（2026-10-29，历史记录）
+
+本阶段按`prompts/03-verification.md`实施，起始工作区干净；未提交/推送，未修改测试期望换取通过。模型控制流单测为显式测试桩；候选Python均经真实远端受限容器。Web额外使用真实百炼qwen3.8-max验证自主纠错，模型Key留在本机。
+
+| ID | 条件 | 状态 | 实际证据 |
+|---|---|---|---|
+| S03-01 | 正确代码真实通过，正常/零次/边界用例完整对应 | PASS | `test_real_cases`的GOOD在n=0/1/5输出0/1/15，3个case ID完整；同服务适用于参考解，未冒充阶段04完整教育产物 |
+| S03-02 | 语法、断言、结果错误、边界失败、运行异常分别定位 | PASS | 缺冒号SYNTAX_ERROR、assert失败ASSERTION_ERROR、print(PASS)仍OUTPUT_MISMATCH、range(1,n)在n=1/5输出0/10而非1/15、除零RUNTIME_ERROR；逐case日志、退出码、耗时和code_hash保存在真实JUnit属性 |
+| S03-03 | 死循环、输出/内存超限不通过，并清理整个执行树 | PASS | while True为TIMEOUT；派生Python死循环同样清理；stdout/stderr分别超64KiB为OUTPUT_LIMIT；300MiB分配触发RESOURCE_LIMIT；后续作业正常；case duration有有界断言 |
+| S03-04 | Web真实容器隔离和固定资源实际生效 | PASS | 候选实际观察UID10001，网络连接失败，根目录写入拒绝，宿主/app、/root/.ssh、Docker Socket不可见，无模型Key；读取cgroup得到cpu.max=50000 100000、memory.max=134217728、pids.max=32、swap.max=0，fork至上限被拒；容器内受限子进程可执行，不开放宿主命令 |
+| S03-05 | 取消完整清理；Manager被杀后重启回收孤儿 | PASS | `test_timeout_descendants_and_client_cancel`在取消后下一真实作业可运行；脚本对本次临时Manager实际SIGKILL/start，孤儿容器ID和清理后空列表见汇总；没有重启用户既有服务 |
+| S03-06 | 固定/教师规格与模型候选分离，不能删用例、改expected或延长时限 | PASS | 教师独立API冻结；Agent未知freeze工具拒绝、run_python_tests额外expected/timeout字段拒绝、旧规格ID拒绝；空/重复ID用例拒绝。候选仅收到代码和input，不收到expected或可写报告 |
+| S03-07 | 代码/规格/镜像/策略变化使旧PASS失效，历史不可当新证据 | PASS | `test_code_spec_runtime_policy_changes_invalidate`覆盖四类依赖；`test_latest_report_only_and_cross_owner_api`验证旧报告effective_status=STALE、最新PASS及跨会话404；重新测试开始立即撤销旧资格，执行器不可用不能沿用PASS |
+| S03-08 | Agent依据真实错误改代码，在原规格重测；展示父候选Diff | PASS | `test_agent_repairs_with_real_errors_same_spec`：OUTPUT_MISMATCH→新代码Hash→PASS，test_spec_revision/hash不变，repair_diff含实际range修改，正式文件未创建；另有下述真实模型证据 |
+| S03-09 | 修复最多2次，不可修复立即停止，恢复不清零 | PASS | `test_agent_stops_immediately_after_second_failed_repair`恰好6次模型响应、3份失败报告后STOPPED/REPAIR_LIMIT，没有第7次模型请求；`test_unrepairable_stops_after_two_and_survives_restart`重开SQLite后不能第3次修复；重复失败Hash和不改代码直接重跑均NO_PROGRESS |
+| S03-10 | 失败、漏测和模型自称通过均不能混入待审候选 | PASS | 一份通过但另一份challenge_answer.py漏测时整个候选闸口拒绝；request_publish无审批副作用；模型声称全部PASS仍VERIFICATION_FAILED；内部Docker错误为RUNNER_ERROR且清理失败关闭Runner |
+| S03-11 | UI区分验证状态与逐用例证据，旧审批显示过期 | PASS（源码/构建） | 现有草稿区接线状态、effective_status、case输入/期望/实际、日志/退出码、Hash与父版本Diff；web-design-guidelines源码Review及TS/Vite构建通过；不代表浏览器交互已验收 |
+| S03-12 | 真实百炼自主调用执行器，依据错误修复并在原规格通过 | PASS | 最终qwen3.8-max共6次成功请求、5次原生工具调用；OUTPUT_MISMATCH→PASS，规格Hash不变、代码Hash改变；成功探针估算¥0.258612，未知预留0笔，实际报告与call ID见下文 |
+| S03-UI | 真实浏览器渲染/操作、Playwright | NOT_TESTED | 仓库规则要求明确授权，本轮未启动浏览器；手动步骤见PROGRESS阶段03末尾 |
+| S03-DEPLOY | 持续运行的公网生产Runner、完整教案/发布/ZIP | NOT_TESTED | 本轮为临时私有隔离验收，结束清理；未配置Runner的实例继续关闭执行；生产部署和完整教育验收不在阶段03 |
+
+当前自动化结果：**72项相关后端回归 + 19项真实容器集成 = 91 PASS**。前端`npm --prefix frontend run build`、`.venv/bin/ruff check backend runner scripts/verify_stage03.py`、`git diff --check`均通过；具体pytest命令见PROGRESS阶段03。证据：[相关回归JUnit](../.runtime/stage03-regression.xml)、[真实容器JUnit](../.runtime/stage03-real-tests.xml)、[汇总/镜像/源码Hash/孤儿清理](../.runtime/stage03-summary.json)、[真实百炼纠错报告](../.runtime/stage03-live-model.json)。这些忽略的本地证据未加入Git，复跑脚本在源码中。
+
+本轮不将2秒/资源参数的配置文本当作隔离证据，使用真实cgroup、拒绝结果、容器清理和后继作业来判断。容器共享宿主内核，Manager持Docker权限，须在专用可信宿主单实例运行；API只连接私有Unix socket，PC不启用裸subprocess降级。
+
+最终真实模型会话 `5e56151eaf664478a6bb417b35427b49`：错误报告 `7dd24f5c69d048ba939a75209a9a49d4`，通过报告 `bf83f69a88484393b4a7e075d02c103b`；真实执行call `call_531276ac6c0a4cb2baf467d6` → 修复call `call_8a1be5f78b7f4d25895ae89e` → 重测call `call_fef750b3f2c44786a9ff1009`。规格Hash始终为`22d5c25a19c97aede101aa95c21d2bcd10fd1d94ee780339758dcda77c44aa88`；代码Hash从`762f7b3823d323f8098c8a3a96e3bd0e85813550e69cc9cd553cd62d2340475e`变为`6b4c4ab8b24e2aa5a9cd19df45d5576250860b2b749d3888d9e6c448764740c7`。错误代码为明确标识的合成夹具，真实修复内容由模型生成；通过报告由隔离执行结果产生。
+
+最终汇总status=PASS、pytest_exit_code=0、restart_orphan_cleanup=PASS、remaining_cases为空。执行镜像`sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159`；Manager镜像`sha256:731ca9846e14ef25a36fca03366501566f0720ef808337ed7135a2d3c9615461`。独立查询确认没有遗留阶段03候选/Manager容器；验收镜像标签和远端临时源码已清理，未删除用户既有容器/基础镜像。
+
+
+## 10. 阶段03对抗性验收（2026-10-29，P1修复前的历史记录）
+
+本轮实际发现并修复1个Runner缺陷：StringIO替换sys.stdin导致合法buffer/FD 0/子进程输入程序误判运行异常。现于同一受限容器内保存代码快照，通过真实stdin管道启动固定Python；未改变冻结用例、比较规则或资源限制。增加7项对抗测试及证据属性，原有断言保留。新增tmpfs探针另修正close刷新时ENOSPC的捕获范围，严格期望仍为errno=28。
+
+最终 **26项真实Runner集成 + 72项相关后端回归 = 98 PASS，0失败/0错误/0跳过**；真实模型单独验证通过。具体命令见PROGRESS本轮记录；ruff/git diff --check通过。本轮纯后端/Runner，不涉及前端修改或浏览器验证。
+
+| 编号 | 用户要求 | 实际结果 | 验收 |
+|---|---|---|---|
+| 1 | 正常循环 | n=0/1/5均输出0/1/15，input()、stdin.buffer、FD 0、继承stdin的子进程均通过 | PASS |
+| 2 | 语法错误 | SYNTAX_ERROR、退出码1、真实SyntaxError日志；不能待审 | PASS |
+| 3 | while死循环 | TIMEOUT，整个容器及子进程清理；无正常退出码，不伪填0 | PASS |
+| 4 | 输出不同 | print(PASS)实际输出PASS仍OUTPUT_MISMATCH，正常退出码0不等于通过 | PASS |
+| 5 | 边界错误 | range(1,n)在n=1/5失败；新增零次循环错误在n=0单独失败，其余用例通过也不能掩盖 | PASS |
+| 6 | 运行异常 | 除零RUNTIME_ERROR；即便先打印全部正确输出再raise，也保持失败 | PASS |
+| 7 | 改已通过代码 | 旧草稿/报告STALE，新草稿NOT_TESTED，待审闸口拒绝；报告仍保留历史 | PASS |
+| 8 | Agent同规格修复重测 | 真实百炼原生工具调用：OUTPUT_MISMATCH→新代码Hash→PASS；test_spec_revision/hash及三条用例保持不变 | PASS |
+| 9 | 无法修复必须停止 | 受控连续错误提案驱动真实Agent Core/Runner，3份失败报告、2次修复后STOPPED/REPAIR_LIMIT；重开SQLite不能重置限额，没有PASS或交付 | PASS |
+| 10 | 权限与资源限制 | 实测UID10001、无外网、不可见宿主目录/Socket/Key、根只读；cgroup 0.5CPU/128MiB/无额外swap/32pids；cap_eff=0、no-new-privileges=1、seccomp=2、nofile=64/core=0、16MiB tmpfs ENOSPC；内存/输出超限、鉴权及策略篡改拒绝、超时/取消/孤儿清理均通过 | PASS |
+
+下面为关键程序的n=5用例原始摘要，换行以\n表示；耗时包含容器生命周期，不是算法CPU耗时。故障程序本身仍为失败状态，PASS只表示系统正确识别并阻断故障。
+
+| 场景 | 输入→冻结期望 | stdout | stderr末行 | exit code | 耗时 | 程序结果 |
+|---|---|---|---|---|---|---|
+| 正常循环 | `5\n` → `15\n` | `"15\n"` | 空 | 0 | 562.71 ms | PASS |
+| 语法错误 | `5\n` → `15\n` | `""` | SyntaxError: expected ':' | 1 | 604.53 ms | SYNTAX_ERROR |
+| 输出不匹配 | `5\n` → `15\n` | `"PASS\n"` | 空 | 0 | 645.31 ms | OUTPUT_MISMATCH |
+| while死循环 | `5\n` → `15\n` | `""` | 空 | null（超时终止，未采集正常退出码） | 2176.33 ms | TIMEOUT |
+| 边界漏项 | `5\n` → `15\n` | `"10\n"` | 空 | 0 | 570.65 ms | OUTPUT_MISMATCH |
+| 运行时异常 | `5\n` → `15\n` | `""` | ZeroDivisionError: division by zero | 1 | 575.07 ms | RUNTIME_ERROR |
+
+真实模型会话`1cbcc8ccfc164fd48a2e392d8b89c7f2`，6次请求/5次原生工具调用；成功报告`9314619831cd4d8e94313618f2e3e5d8`。固定测试Hash`22d5c25a19c97aede101aa95c21d2bcd10fd1d94ee780339758dcda77c44aa88`；代码Hash从`762f7b3823d323f8098c8a3a96e3bd0e85813550e69cc9cd553cd62d2340475e`改为`6b4c4ab8b24e2aa5a9cd19df45d5576250860b2b749d3888d9e6c448764740c7`。用量估算/保守预留¥0.261036，未知预留0笔，不是精确账单；沿用实例SQLite预算。
+
+[十项完整证据JSON（含所有stdout/stderr、退出码、耗时、用例、Hash与Agent状态）](../.runtime/stage03-adversarial-evidence.json)、[真实Runner JUnit](../.runtime/stage03-adversarial-real-tests.xml)、[72项相关回归JUnit](../.runtime/stage03-adversarial-regression.xml)、[真实模型原生调用/报告](../.runtime/stage03-adversarial-live-model.json)、[源码/测试Hash与清理汇总](../.runtime/stage03-adversarial-summary.json)。修复前3 FAIL与中间探针1 FAIL证据均保留，没有改成成功或覆盖删除。
+
+修复涉及`runner/docker_runner.py`、`backend/tests/integration/test_verification.py`、`scripts/verify_stage03.py`及PROGRESS/ACCEPTANCE。无剩余阶段03验收P0；正式教育manifest/发布/导出和浏览器不属于本次验收，不能由此升为PASS。临时Runner非持续部署，容器共享宿主内核的风险仍存在。
+
+
+## 11. 阶段03 P1修复 — Python后缀大小写一致性（2026-10-29，当前结果）
+
+根因：Workspace已允许`.PY/.pY`，但其余入口只检查小写`.py`，未测试代码可被当作文档创建待审请求。修复在`workspaces.py`提供统一`is_python_path`，API规格冻结、Verification草稿识别/候选集合、request_publish、Agent完成状态及修复Diff全部复用；保留原始文件名，不放宽工作区边界。
+
+| 条件 | 状态 | 实际证据 |
+|---|---|---|
+| 修复前真实复现绕过 | PASS（缺陷复现） | 新增21项先得到14 FAIL/7 PASS；大写后缀创建WAITING_APPROVAL，验证入口拒绝识别，原证据[before JUnit](../.runtime/stage03-suffix-before.xml)保留 |
+| `.py/.PY/.pY`未测试/失败/过期不能待审 | PASS | 18项参数组合覆盖代码与同组Markdown发布，均VERIFICATION_REQUIRED、无审批记录/审批事件、无正式文件改动；合成状态只作策略测试，不冒充执行报告 |
+| 规格冻结、验证与Agent完成状态一致 | PASS | 三种后缀API冻结均201且n=0/1/5期望保持0/1/15；Verification识别为Python；模型文本自称完成仍VERIFICATION_FAILED |
+| 真实失败、通过和编辑失效 | PASS | 三种后缀实际执行raise RuntimeError得到RUNTIME_ERROR，原规格下修复为GOOD得到PASS；再次编辑旧PASS为STALE、新草稿NOT_TESTED，request_publish拒绝且审批数0 |
+| 整组候选包含大写后缀 | PASS | 同组other.py真实通过后，请求发布other.py仍因answer.PY/answer.pY漏测被拒绝，无审批记录，不能通过选择另一文件绕过 |
+| 相关回归与源代码检查 | PASS | 96项相关后端回归（含34项策略测试）+29项真实Runner集成=125 PASS，0失败/0错误/0跳过；ruff/git diff --check通过；当前源码/测试Hash与本轮汇总相符 |
+
+真实Runner三种后缀分别留下RUNTIME_ERROR/PASS报告与编辑后未测状态，审批记录均为0。证据：[策略JUnit](../.runtime/stage03-suffix-policy.xml)、[96项后端回归](../.runtime/stage03-suffix-regression.xml)、[29项真实Runner及suffix_gate逐案例报告](../.runtime/stage03-suffix-real-tests.xml)、[运行汇总/源码Hash/清理](../.runtime/stage03-suffix-summary.json)。实际命令见PROGRESS本轮记录；后端回归约7.64秒、真实Runner约87.61秒。既有Starlette TestClient弃用警告1条，未升级依赖。
+
+本轮只修复该P1，保留先前所有未提交改动；未改既定测试输入/期望，没有调用真实模型或启动浏览器（纯后端修改），未Git提交/推送。临时远端容器/镜像标签/源码目录已清理并独立查询为空，SSH控制连接已关闭。本次P1无剩余问题；阶段05正式写入仍按原约定阻断，不能以本轮策略回归代替完整产品验收。

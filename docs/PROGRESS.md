@@ -192,3 +192,102 @@ git diff --check
 结果：**62 passed**，1条既有Starlette TestClient未来弃用警告；ruff和空白检查通过。新增9个回归案例，修复前已实际复现6个FAIL（P1两端2个、P2四个），保留断言后通过。完整测试与计时属性见[JUnit报告](../.runtime/stage02-review-tests.xml)，真实API命令和脱敏结果见本会话及专项JSON；没有把合成历史或协议桩计作真实API证据。
 
 当前完整九项HTTP/PC/Web/远端验收、浏览器、前端构建、隔离Runner均未在本轮重跑，保持NOT_TESTED；本次结论仅覆盖两项修复及相关后端回归。无需为纯后端修复重新做前端/部署工作。
+
+## 2026-10-29：阶段03 — Python真实验证闭环
+
+开始时 `git status --short` 为空；按 `prompts/03-verification.md` 实现验证、Runner与必要Agent/UI接线。未修改AGENTS、PLAN、生产配置、`.env`、依赖/锁文件或CI；未提交/推送Git，未开发完整教育界面或正式发布。
+
+### 实现与主要文件
+
+- `backend/app/verification/models.py`：严格Pydantic的TestCase/TestSpec/CaseResult/VerificationReport，逐用例记录输入、expected、actual、stdout/stderr、退出码、耗时、状态、错误及执行证据。stdin/stdout契约精确比较，换行也是规格的一部分。
+- `verification/service.py`：固定累加基准n=0/1/5与教师冻结规格，期望值在候选容器之外比对；报告指纹绑定代码Hash、测试Hash、不可变镜像ID及Runner策略Hash。报告保留历史，代码/规格/镜像/策略变更使旧资格过期；只有最新完整成功报告才可待教师审核。
+- `runner/docker_runner.py`、`manager.py`、`Dockerfile`：独立可信Manager，仅私有鉴权Unix socket；公网API使用`verification/runner.py`，不持有Docker Socket。候选每用例一次性容器、UID10001、无网络、只读根、默认seccomp、cap-drop、no-new-privileges，0.5CPU/128MiB内存与相同swap总额/32pids/64FD/16MiB tmpfs；stdout/stderr各64KiB，单例2秒、整套30秒。超时/取消删除整个容器；Manager重启回收标记孤儿；清理失败关闭执行器。
+- `agent.py`、`tools.py`：真实失败报告按原call_id回传；上下文始终提供现有草稿/规格ID；模型只改代码，再用同一冻结规格重测。按会话+路径持久化两次修复额度与失败Hash，重启/新run不重置；两次修复仍失败立即STOPPED/REPAIR_LIMIT，重复失败Hash报NO_PROGRESS。正式文件Diff保留，新增Python修复Diff对照父候选。
+- `api.py`、`domain.py`、`config.py`、`storage.py`：教师冻结规格API、资源归属、只读报告与有效状态、SQLite规格/报告/修复记录；规格不能由Agent工具改写。重新测试开始即撤销旧资格，不能在执行器故障后沿用旧PASS。整组Python候选有失败/漏测/过期时阻断待审请求，不能隐藏失败题；正式批准仍返回PUBLISH_NOT_READY。
+- `frontend/src/App.tsx`、`api.ts`：沿用现有草稿区区分未测/失败/超时/过期/用例通过，展开用例、日志、退出码、版本与修复Diff。仅按ui-ux轻量流程接线，按web-design-guidelines做源码Review；真实浏览器尚未验证。
+- `backend/tests/unit/test_verification_policy.py`、`integration/test_verification.py`、`scripts/verify_stage03.py`：策略回归与必须连接真实Manager的容器测试；缺环境直接失败，不skip，不使用执行Mock。脚本可临时构建Manager、转发Unix socket、注入重启故障并清理资源。README补充配置、教师API和复跑入口。
+
+### 环境阻塞与排错
+
+- 本机`docker info --format '{{.ServerVersion}}'`实际失败：daemon socket不存在。没有启动本机Docker或用裸subprocess降级；向用户说明后，在用户提供的已整备SSH主机使用临时Manager/容器验证。没有上传模型Key、发布端口、改既有服务或安装宿主依赖。
+- 首轮真实容器15 PASS/1 FAIL：客户端取消后下一作业429。修复为显式私有DELETE按job_id取消并等待完整清理，不单靠HTTP断连；原断言保留后通过。
+- 进程限额测试曾因同时启动大量独立Python解释器先触发128MiB内存限制而失败。改为fork共享只读页、子进程pause，专门触发32pids；CPU/内存/pids/swap从候选cgroup实际读取断言，没有放宽生产限额或删除隔离断言。
+- 长文本恢复回归发现新修复Diff重复回传正文耗尽预算；仅为Python代码保存独立repair_diff，保留原正式文件Diff与父版本语义，所有原回归断言恢复通过。
+- 首次真实模型探针因当前上下文没有草稿ID，尝试猜测ID，最终STEP_BUDGET停止。新增真实草稿/规格索引；原失败调用与预算留库，报告保存在`.runtime/stage03-live-model-failed-no-index.json`。后续探针已真实修复通过，但脚本误把RESERVED_UNKNOWN预留也当成功请求，缺请求ID而报错；改为分别核验成功请求ID/usage与未知预留，不把未知用量冒充实耗，保留原证据`.runtime/stage03-live-model-recovered-with-unknown.json`。
+
+### 实际验证
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_session_resume.py -q --junitxml=.runtime/stage03-regression.xml -o junit_family=xunit1
+.venv/bin/python scripts/verify_stage03.py <用户提供的SSH目标> --real-model
+npm --prefix frontend run build
+.venv/bin/ruff check backend runner scripts/verify_stage03.py
+git diff --check
+```
+
+离线策略/相关后端回归 **72 PASS**，真实容器回归 **19 PASS**（合计91项）；前端TypeScript/Vite构建、ruff、diff空白检查通过。离线控制流Provider为显式测试桩；真实容器里的候选Python实际执行；百炼探针单列，不混淆三类证据。既有Starlette TestClient弃用警告1条，未升级依赖。
+
+证据：[相关回归JUnit](../.runtime/stage03-regression.xml)、[真实容器JUnit及逐用例报告](../.runtime/stage03-real-tests.xml)、[本轮汇总与源码Hash](../.runtime/stage03-summary.json)、[真实模型纠错](../.runtime/stage03-live-model.json)、[运行日志](../.runtime/stage03-run.log)。最终模型与清理结果见ACCEPTANCE第9节。
+
+### 边界与下一步
+
+本阶段核心验证无剩余P0阻塞。隔离Manager为独立按需配置组件，本次临时验收资源会清理；未配置的PC/Web实例仍RUNNER_UNAVAILABLE，不暗中启用宿主执行。容器共享内核，持Docker权限的Manager属于高信任面；仅在专用可信宿主单实例运行，不据此宣称任意敌意代码生产平台。
+
+阶段04的结构化教案、完整示例/三档题清单和教育审核，以及阶段05的正式提交/导出/公网HTTPS仍NOT_TESTED。本阶段没有把原题B2/D4的完整教育能力提前标PASS。测试规格编辑界面未开发，当前由教师API冻结。浏览器/Playwright未运行：遵守未获明确授权不启动浏览器的规则。手动验收：配置隔离器与教师规格→发送验证修复需求→展开草稿报告核对具体失败case/日志→检查修复Diff及新PASS→改代码后确认旧报告“已过期”，未通过的候选不能请求待审；正式写入仍被阻断。
+
+最终真实模型与清理：汇总PASS；qwen3.8-max会话`5e56151eaf664478a6bb417b35427b49`共6次成功请求/5次原生调用，真实报告OUTPUT_MISMATCH→PASS，冻结规格Hash不变。成功探针估算¥0.258612、未知预留0笔；阶段03所有探针（包括失败）在原SQLite账本累计估算/保守预留¥2.350224，未知预留5笔，不是精确账单。中途另一次探针遇PROVIDER_UNAVAILABLE三次后按预算停止，保留`.runtime/stage03-live-model-network-failed.json`；没有清零重试预算或切换Mock。工具说明与索引补充正式base_hash语义，最终新探针没有版本冲突。
+
+最终19项真实容器回归耗时45.62秒，72项相关后端回归7.34秒；前端构建产物JS `index-BCwFtBGv.js`。汇总记录源码Hash与镜像ID。再次查询阶段03候选/Manager容器为空；临时Manager镜像标签和源码目录清理，不保留正在运行的验收服务。
+
+## 2026-10-29：阶段03对抗性验收与真实stdin修复
+
+本轮开始工作区保留上一轮阶段03未提交改动，全部保留；只新增对抗测试、修正Runner执行适配、给现有验收脚本增加证据前缀并更新PROGRESS/ACCEPTANCE。未改既定用例的input/expected、执行资源限制或原有断言；未修改前端、生产配置、`.env`、锁文件或CI，未提交/推送。
+
+### 实际发现与修复
+
+- 真实Runner首轮 **23 PASS / 3 FAIL**。正常循环程序使用`sys.stdin.buffer.readline()`报`AttributeError: '_io.StringIO' object has no attribute 'buffer'`；使用`os.read(0,64)`或继承stdin的子进程得到空输入并报ValueError。三份报告退出码均为1，属于正确程序被执行适配层误判，并非代码/测试本身错误。原始证据保存在`.runtime/stage03-adversarial-before-real-tests.xml`和对应before日志/汇总。
+- 根因在`runner/docker_runner.py`的容器内BOOTSTRAP：先消费JSON，再把Python的`sys.stdin`替换成StringIO，没有给FD 0及子进程提供真实输入。修复为在同一受限容器的tmpfs写入本次代码快照，以固定Python解释器/参数启动候选，使用真实stdin管道传入冻结输入；stdout/stderr仍由容器外捕获，expected仍不进入容器。子进程负返回码转为对应信号退出码，超时继续删除整个容器进程树，所有原隔离参数保持不变。Runner源码Hash自动变化，因此旧报告不能沿用。
+- 修复stdin后 **25 PASS / 1 FAIL**：新增tmpfs探针在磁盘达到16MiB后捕获write的ENOSPC，却未捕获close再次flush的ENOSPC。修正探针为整个文件生命周期捕获OSError；继续严格要求errno=28、零capabilities、no-new-privileges=1、seccomp=2、nofile=64/core=0，未改限额或期望值。中间结果保存在`.runtime/stage03-adversarial-fixed-stdin-real-tests.xml`及对应日志。
+
+### 新增对抗覆盖与复跑入口
+
+在`backend/tests/integration/test_verification.py`原19项上新增7项：三种真实stdin方式、正确输出后再抛异常仍失败、零次循环错误不能被正常用例掩盖、Manager鉴权/禁止参数拒绝、实际权限/FD/core/tmpfs限额。原Hash失效、同规格修复与修复耗尽测试增加JUnit证据属性，没有放宽断言。
+
+`scripts/verify_stage03.py`新增`--evidence-prefix`，保存本轮独立证据，不覆盖首轮阶段03历史报告；汇总增加测试源码Hash，便于确认实际运行的是哪套断言。
+
+```bash
+.venv/bin/python scripts/verify_stage03.py <用户提供的SSH目标> --evidence-prefix stage03-adversarial-before
+.venv/bin/python scripts/verify_stage03.py <用户提供的SSH目标> --evidence-prefix stage03-adversarial --real-model
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_session_resume.py -q --junitxml=.runtime/stage03-adversarial-regression.xml -o junit_family=xunit1
+.venv/bin/ruff check runner backend/tests/integration/test_verification.py scripts/verify_stage03.py
+git diff --check
+```
+
+最终结果、十项逐条判定及关键stdout/stderr/退出码/耗时见ACCEPTANCE第10节和`.runtime/stage03-adversarial-evidence.json`。本轮真实候选均在远端私有Manager的一次性受限容器执行；不在API/本机宿主裸跑，不发布公网端口，不上传模型Key。不可修复分支使用受控连续错误提案来确定性触发Agent Core两次修复上限，真实模型自主修复分支单独记录，二者不混淆。
+
+最终复验：26项真实Runner集成在70.16秒内全部通过；72项相关后端回归在7.37秒内全部通过，均0失败/0跳过，保留1条既有Starlette弃用警告。真实qwen3.8-max共6次请求/5次工具，原用例下OUTPUT_MISMATCH→PASS，规格Hash不变，估算/保守预留¥0.261036（未知0笔）。最终汇总status=PASS、源码/测试Hash与当前文件一致。十项验收与逐用例数据见[证据JSON](../.runtime/stage03-adversarial-evidence.json)及ACCEPTANCE第10节。容器/镜像标签/临时源码清理后独立查询确认；未保留运行中的服务。
+
+## 2026-10-29：阶段03 P1 — Python后缀大小写绕过验证闸口
+
+本轮保留开始时全部未提交改动。根因为Workspace路径允许规则已使用`suffix.lower()`，但规格冻结、验证、发布/整组候选与Agent完成状态使用大小写敏感的`endswith('.py')`，导致`.PY/.pY`被当作普通文档。
+
+最小修复：在`backend/app/workspaces.py`增加统一的`is_python_path`（取最后后缀并lower），由`api.py`、`verification/service.py`、`tools.py`、`agent.py`复用；同时覆盖修复Diff的Python识别。原始文件名大小写、工作区边界及测试规格保持不变，没有缩窄文件权限来掩盖验证遗漏。
+
+新增回归：`backend/tests/unit/test_verification_policy.py`参数化`.py/.PY/.pY` × NOT_TESTED/RUNTIME_ERROR/STALE × 发布代码/发布同组Markdown，要求VERIFICATION_REQUIRED、审批和审批事件均为空；补充规格冻结API与Agent完成状态。未修复时先实际得到 **14 FAIL / 7 PASS**，证据`.runtime/stage03-suffix-before.xml`；修复后该文件 **34 PASS**。
+
+真实Runner回归在`backend/tests/integration/test_verification.py`参数化三种后缀：异常代码未测时拒绝，实际运行失败仍拒绝，原冻结规格下修复为正确代码后可验证通过；再次编辑后旧PASS过期、新版本未测试均拒绝。同组另一个小写文件即使真实通过，也不能绕过大写文件漏测，所有拒绝阶段无审批记录。
+
+实际命令：
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit/test_verification_policy.py -k python_suffix -q --junitxml=.runtime/stage03-suffix-before.xml -o junit_family=xunit1
+.venv/bin/python -m pytest backend/tests/unit/test_verification_policy.py -q --junitxml=.runtime/stage03-suffix-policy.xml -o junit_family=xunit1
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_api.py backend/tests/integration/test_session_resume.py -q --tb=short --junitxml=.runtime/stage03-suffix-regression.xml -o junit_family=xunit1
+.venv/bin/python scripts/verify_stage03.py <已授权SSH目标> --evidence-prefix stage03-suffix
+.venv/bin/ruff check backend/app backend/tests
+git diff --check
+```
+
+相关后端回归96 PASS，34项策略测试包含在这96项内，不重复累计。真实Runner结果与证据见ACCEPTANCE第11节。本轮不调用真实模型、不修改前端、不启动浏览器；未改生产配置、`.env`、依赖/锁文件或CI，未提交/推送Git。
+
+最终结果：96项相关后端回归（约7.64秒，含34项策略测试）+29项真实Runner集成（约87.61秒）=125 PASS，0失败/0跳过。`.py/.PY/.pY`均真实失败/通过/编辑失效，所有拒绝场景审批数0，整组检查包含大写文件；源码/测试Hash核验一致。ruff与git diff --check通过。证据见ACCEPTANCE第11节及`.runtime/stage03-suffix-*.xml/json`。远端候选/Manager容器、镜像标签、临时源码目录独立查询为空，SSH控制连接已关闭；本轮不保留运行服务。

@@ -8,7 +8,7 @@ from app.domain import AppError, dumps, now, uid
 
 
 class Store:
-    tables = {"sessions", "workspaces", "runs", "calls", "drafts", "approvals", "usage"}
+    tables = {"sessions", "workspaces", "runs", "calls", "drafts", "approvals", "usage", "test_specs", "reports", "repairs"}
 
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)

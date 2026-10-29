@@ -1,8 +1,8 @@
 # 耘耘AI助教
 
-阶段 02 工程骨架：Python 3.12 / FastAPI / Pydantic / SQLite，共享串行 Agent Core，React / TypeScript / Vite / Tailwind 教师工作台。当前可真实调用百炼工具、读授权工作区、保存草稿、查看 diff、暂停审批及恢复会话。
+阶段 03 验证闭环：Python 3.12 / FastAPI / Pydantic / SQLite，共享串行 Agent Core，React / TypeScript / Vite / Tailwind 教师工作台。当前可真实调用百炼工具、读授权工作区、保存草稿、查看 diff、暂停审批及恢复会话。
 
-**代码执行器、教育结构化产出、正式批准/写入与教案包导出尚未开放。** `run_python_tests` 明确返回 `RUNNER_UNAVAILABLE / NOT_TESTED`，不会执行未知代码或显示假通过；阶段 03/04/05 分别补齐这些能力。
+**Python 草稿可经独立隔离 Runner 真实验证，失败最多自动修复两次；固定用例全部通过后才可待教师审核。** 教育结构化产出、正式批准/写入与教案包导出仍未开放。未配置 Runner 时明确返回 `RUNNER_UNAVAILABLE / NOT_TESTED`，PC/Web 均不降级为宿主 subprocess。
 
 ## 安装与配置
 
@@ -53,7 +53,7 @@ docker run --rm --name yunyun-tutor -p 127.0.0.1:8000:8000 \
 
 ```bash
 # 离线控制流/权限/恢复测试，模型为测试Mock；不会消费Key
-.venv/bin/python -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/unit/test_provider.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_api.py -q
+.venv/bin/python -m pytest backend/tests/unit backend/tests/integration/test_session_resume.py backend/tests/integration/test_api.py -q
 .venv/bin/ruff check backend scripts
 npm --prefix frontend run build
 # 真实启动PC/Web进程并停止、重启，读取静态界面和SSE；模型显式Mock，不启动浏览器
@@ -75,3 +75,28 @@ npm --prefix frontend run build
 默认上限：每 run 12 次模型请求、24 次工具调用、12 分钟主动时间、输入 80k / 输出 12k token、费用估算 ¥3；每会话 ¥9、实例累计 ¥45。请求前保守预留，厂商 usage 后结算估值，超时/中断预留不会清零。已结束 run 的消息和事件不因刷新重放。正式审批接口在本阶段只支持拒绝；批准会明确返回 `PUBLISH_NOT_READY`。
 
 浏览器尚未验证。手动操作：启动 PC 后输入“读取工作区示例并提出修改草稿”，预期出现真实文件读取记录和 diff，正式文件不变；刷新恢复会话，检查失败提示、工作区展开及审核拒绝后的状态。完整验收状态与本阶段执行证据见 [PROGRESS](docs/PROGRESS.md) 和 [ACCEPTANCE](docs/ACCEPTANCE.md)。
+
+## 阶段 03：隔离验证与固定测试
+
+执行入口为 stdin/stdout Python 脚本，逐字节比较 UTF-8 stdout（包括换行），不能在候选内部自报断言/PASS。首个人工固定基准 `sum_1_to_n` 的输入 `0/1/5` 对应输出 `0/1/15`，均带换行。新题须由教师通过 API 冻结用例；模型不能添加、删除或修改冻结用例。
+
+1. 在专用可信宿主预拉取 Python 3.12 镜像，取得 `docker image inspect --format '{{.Id}}' python:3.12-slim` 的不可变 SHA256。该步骤由部署者执行，Runner 不自动拉取镜像。
+2. 独立启动 `python -m runner.manager`，通过进程环境配置 `RUNNER_IMAGE=<不可变ID>`、`RUNNER_TOKEN=<至少32字符随机口令>`、`RUNNER_SOCKET=<私有Unix socket绝对路径>`。Manager 可访问 Docker Socket，公网 API 不得拥有该权限。容器构建入口是 `runner/Dockerfile`。每个专用 Docker 宿主只运行一个 Manager；启动会回收 `yunyun.runner=stage03` 标签的孤儿作业。
+3. API 进程仅配置 `RUNNER_SOCKET`、`RUNNER_TOKEN`，共享私有 Unix socket；socket 为 0600，API 与 Manager 须使用可访问该 socket 的同一 UID。跨主机只使用私有转发。不要将 Docker Socket、教师目录、数据库或模型 Key 挂入候选容器。Manager 与公网 API 分开部署，Manager 不发布 TCP 端口。
+4. 教师先创建会话，然后 `POST /api/sessions/{sid}/test-specs`：`{"path":"sum.py","expected_revision":0,"baseline":"sum_1_to_n"}`；或用 `cases:[{"id":"zero","input":"0\n","expected":"0\n"}]` 替代 baseline。接口沿用 cookie、同源和 PC 能力口令校验；返回新规格 ID 并增加会话 revision。先停止活动任务才能改规格。此阶段未开发测试规格编辑界面。
+5. 发送备课请求时使用最新会话 revision。Agent 从索引读取草稿ID/规格ID，调用 `get_verification`、`run_python_tests`，根据真实错误修改代码并重测。UI 显示逐用例输入/期望/实际、日志/退出码、版本证据和修复 Diff。历史报告只作历史，任何代码/规格/镜像/策略变更均失效；测试通过仍需教师审核。
+
+固定执行策略：每用例 2 秒、每段代码整套 30 秒，stdout/stderr 各 64 KiB；非 root UID10001、0.5 CPU、128 MiB 内存且无额外 swap、32 pids、64 文件描述符、禁 core dump、只读根目录、16 MiB tmpfs、无网络、cap-drop=ALL、no-new-privileges、默认 seccomp。容器内部可用 Python 标准库和子进程，能力受同一容器限制；没有宿主命令工具。超时/取消删除整个容器，清理失败则关闭 Runner 并报告错误。
+
+真实容器测试不能使用执行桩，也不会因缺少 Runner 而 skip：
+
+```bash
+# 先以SSH agent或现有控制连接登录；不把SSH密码放入命令、源码或.env
+.venv/bin/python scripts/verify_stage03.py user@host
+# 加真实百炼纠错探针；在本机调用模型，Key不传服务器，沿用实例SQLite费用账本
+.venv/bin/python scripts/verify_stage03.py user@host --real-model
+# 已有私有Manager时，可通过进程环境YUNYUN_TEST_RUNNER_SOCKET/TOKEN直接运行
+.venv/bin/python -m pytest backend/tests/integration/test_verification.py -q
+```
+
+探针创建临时 Manager、候选容器与 Unix socket 转发，不发布公网端口，结束清理本次容器/镜像标签/远端源码。证据保存在忽略的 `.runtime/stage03-*.json/xml`。没有可用隔离器时如实失败，不在本机执行未知代码。容器共享宿主内核，Manager 的 Docker 权限是高信任边界；本阶段验证不等于公网生产加固或完整教育验收。

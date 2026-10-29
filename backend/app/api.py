@@ -14,6 +14,8 @@ from app.config import PROJECT_ROOT, Settings
 from app.domain import AppError, Decision, NewMessage, NewSession, Resume, dumps, sha, uid
 from app.providers import Provider
 from app.storage import Store
+from app.verification.models import FreezeTests
+from app.workspaces import is_python_path
 
 
 def create_app(settings: Settings | None = None, provider: Provider | None = None) -> FastAPI:
@@ -114,13 +116,19 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
     async def health(request: Request):
         return result(request, {"status": "ok", "version": "0.2.0"})
 
+    async def runner_identity():
+        try:
+            return await agent.verification.runner.identity()
+        except AppError:
+            return None
+
     @app.get("/api/runtime")
     async def runtime(request: Request):
         return result(request, {"mode": settings.yunyun_mode, "provider": settings.llm_provider,
                                 "model": "MOCK_LLM" if settings.llm_provider == "mock" else settings.llm_model,
                                 "mock": settings.llm_provider == "mock",
                                 "key_configured": bool(settings.dashscope_api_key.get_secret_value()),
-                                "runner": "UNAVAILABLE", "publish": "UNAVAILABLE"})
+                                "runner": "ISOLATED" if await runner_identity() else "UNAVAILABLE", "publish": "UNAVAILABLE"})
 
     @app.post("/api/client")
     async def client(request: Request):
@@ -147,13 +155,46 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
     @app.get("/api/sessions/{sid}")
     async def snapshot(request: Request, sid: str):
         value = session(request, sid)
+        identity = await runner_identity()
+        with store.tx():
+            agent.verification.refresh(sid, identity)
         return result(request, {"session": {k: v for k, v in value.items() if k != "owner"},
                                 "messages": store.messages(sid), "runs": store.find("runs", sid),
                                 "tool_calls": store.find("calls", sid),
                                 "drafts": store.find("drafts", sid),
                                 "approvals": store.find("approvals", sid),
+                                "test_specs": store.find("test_specs", sid),
+                                "verification_reports": [{**r, "effective_status": agent.verification.report_status(r, identity)}
+                                                         for r in store.find("reports", sid)],
                                 "usage": store.find("usage", sid),
                                 "event_cursor": store.cursor(sid)})
+
+    @app.post("/api/sessions/{sid}/test-specs", status_code=201)
+    async def freeze_tests(request: Request, sid: str, body: FreezeTests):
+        value = session(request, sid)
+        # 使用同一工作区路径策略，测试规格永不由模型工具写入。
+        agent.workspace(value).parts(body.path)
+        if not is_python_path(body.path):
+            raise AppError("NOT_PYTHON_DRAFT", "测试规格只能绑定 Python 文件。", 422)
+        with store.tx():
+            current = store.get("sessions", sid)
+            if current["revision"] != body.expected_revision:
+                raise AppError("REVISION_CONFLICT", "会话已更新，请刷新。", 409)
+            if any(r["status"] in {"READY", "RUNNING", "WAITING_APPROVAL"} for r in store.find("runs", sid)):
+                raise AppError("RUN_ACTIVE", "请先停止当前任务，再冻结新的测试规格。", 409)
+            spec = agent.verification.freeze(sid, body.path, body.cases, body.baseline)
+            current["revision"] += 1
+            store.put("sessions", current)
+        return result(request, {"test_spec": spec})
+
+    @app.get("/api/verification-reports/{report_id}")
+    async def verification_report(request: Request, report_id: str):
+        report = resource(request, "reports", report_id)
+        identity = await runner_identity()
+        with store.tx():
+            agent.verification.refresh(report["session_id"], identity)
+        effective = agent.verification.report_status(report, identity)
+        return result(request, {"report": report, "effective_status": effective})
 
     @app.get("/api/workspaces/{wid}/files")
     async def files(request: Request, wid: str):

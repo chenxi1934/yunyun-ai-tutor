@@ -64,6 +64,10 @@ class RunPythonTests(StrictModel):
     test_spec_revision: str = Field(min_length=1, max_length=64)
 
 
+class GetVerification(ReadDraft):
+    pass
+
+
 class RequestPublish(StrictModel):
     draft_id: str = Field(min_length=1, max_length=64)
 

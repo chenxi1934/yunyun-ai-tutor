@@ -10,6 +10,7 @@ const eventNames: Record<string, string> = {
   'run.created': '已接收需求', 'run.started': '开始处理', 'model.requested': '正在思考…',
   'model.completed': '已收到模型回复', 'model.failed': '模型调用失败',
   'tool.started': '开始操作', 'tool.completed': '操作已完成', 'tool.failed': '操作失败',
+  'verification.started': '开始验证代码', 'verification.completed': '代码验证已结束', 'test_spec.frozen': '测试规格已冻结',
   'artifact.revised': '草稿已保存', 'approval.requested': '请审核文件变更',
   'approval.decided': '已拒绝变更', 'run.paused': '已暂停，等待审核',
   'run.failed': '本轮失败', 'run.stopped': '本轮已停止', 'run.completed': '本轮已结束',
@@ -17,7 +18,13 @@ const eventNames: Record<string, string> = {
 }
 const toolNames: Record<string, string> = {
   list_files: '列出工作区文件', read_file: '读取文件', propose_patch: '保存草稿',
-  run_python_tests: '请求代码验证', request_publish: '请求正式变更',
+  read_draft: '读取草稿', get_verification: '读取测试与报告', run_python_tests: '执行代码验证', request_publish: '请求正式变更',
+}
+const verificationLabels: Record<string, string> = {
+  PASS: '用例通过，待教师审核', NOT_TESTED: '未测试', STALE: '验证已过期，请重新测试',
+  SYNTAX_ERROR: '语法错误', ASSERTION_ERROR: '断言失败', OUTPUT_MISMATCH: '输出不匹配',
+  RUNTIME_ERROR: '运行异常', TIMEOUT: '执行超时', RESOURCE_LIMIT: '资源超限',
+  OUTPUT_LIMIT: '输出超限', RUNNER_ERROR: '执行器故障', INTERRUPTED: '验证中断',
 }
 const active = new Set(['READY', 'RUNNING', 'WAITING_APPROVAL', 'INTERRUPTED'])
 
@@ -143,7 +150,7 @@ export default function App() {
           onClick={() => { setSid(s.id); setError('') }}>
           <span>{s.context.topic || '备课会话'}</span><small>{s.context.grade} · {new Date(s.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</small>
         </button>) : <p className="muted">开始后，会话会保存在这里。</p>}</nav>
-      <p className="sidebar-note">{runtime?.mode === 'pc' ? '本机授权工作区' : '独立演示工作区'}<br />代码执行尚未接通</p>
+      <p className="sidebar-note">{runtime?.mode === 'pc' ? '本机授权工作区' : '独立演示工作区'}<br />{runtime?.runner === 'ISOLATED' ? '隔离代码执行可用' : '隔离执行器不可用，禁止交付代码'}</p>
     </aside>
 
     <main id="conversation" className="conversation">
@@ -151,7 +158,7 @@ export default function App() {
         <div><h1 className="page-title">教师备课工作台</h1><span className={runtime?.mock ? 'badge mock' : 'badge'}>{runtime?.mock ? 'MOCK_LLM · 离线演示' : runtime?.model || '连接中…'}</span></div>
         <button className="subtle" onClick={() => setShowWorkspace(v => !v)} aria-expanded={showWorkspace}><FolderOpen size={16} aria-hidden="true" />工作区</button>
       </header>
-      <div className="notice">阶段 02 · 可读取文件与查看草稿。代码未验证，暂不提供正式写入或教案包。</div>
+      <div className="notice">代码须通过冻结用例后交由教师审核；正式写入与教案包尚未开放。</div>
       {runtime && !runtime.mock && !runtime.key_configured && <p className="alert" role="alert">未配置百炼密钥，请完成本地配置并重启服务。</p>}
       {error && <div className="alert" role="alert">{error}{!connected && <button onClick={() => void connect()}>重新连接</button>}</div>}
       <div className="chat-scroll">
@@ -195,8 +202,21 @@ export default function App() {
         {!files.length && <p className="muted">{snapshot ? '工作区为空，可以请助教提出新文件草稿。' : '正在读取工作区…'}</p>}
         {file && <details open><summary>{file.path}</summary><pre>{file.content}</pre></details>}
         <h3>修改草稿</h3>{!snapshot?.drafts.length && <p className="muted">助教提出的修改会显示在这里。</p>}
-        {snapshot?.drafts.map(d => <section className="draft" key={d.id}><strong>{d.path}</strong><p className="muted">版本 {d.revision} · {d.operation === 'delete' ? '待删除' : '草稿'} · 未测试{d.mock ? ' · MOCK_LLM' : ''}</p><details><summary>查看文件差异</summary><pre>{d.diff || '内容无差异'}</pre></details>
-          {snapshot.approvals.filter(a => a.draft_id === d.id).map(a => <div key={a.id}>{a.status === 'PENDING' ? <><p>已请求正式变更；阶段 02 暂不开放批准写入。</p><button disabled={pending} onClick={() => void action(`/approvals/${a.id}/decision`, { decision: 'reject', expected_revision: snapshot.session.revision })}>拒绝本次变更</button></> : <p className="muted">{a.status === 'REJECTED' ? '已拒绝，正式文件未改变' : '请求已取消'}</p>}</div>)}
+        {snapshot?.drafts.map(d => <section className="draft" key={d.id}><strong>{d.path}</strong><p className="muted">版本 {d.revision} · {d.operation === 'delete' ? '待删除' : '草稿'} · {verificationLabels[d.verification_status] || '未测试'}{d.mock ? ' · MOCK_LLM' : ''}</p><details><summary>查看文件差异</summary><pre>{d.diff || '内容无差异'}</pre></details>
+          {d.repair_diff && <details><summary>与上一版代码对比</summary><pre>{d.repair_diff}</pre></details>}
+          {snapshot.verification_reports?.filter(r => r.draft_id === d.id).map(r => <details key={r.id}>
+            <summary>验证报告：{verificationLabels[r.effective_status] || r.effective_status}</summary>
+            <p className="muted">{r.effective_status === 'STALE' ? '历史结果不能作为当前交付依据。' : '仅覆盖这些输入；教学适用性仍需教师审核。'}</p>
+            {r.cases.map(c => <section key={c.id} aria-label={`用例 ${c.id}`}>
+              <strong>{c.id} · {verificationLabels[c.status] || c.status}</strong>
+              <p>耗时 {Math.round(c.duration_ms)} ms · 退出码 {c.exit_code ?? '无'}</p>
+              <pre>{`输入：${c.input}\n期望：${c.expected}\n实际：${c.actual}`}</pre>
+              {c.error && <p className="alert">{c.error}</p>}
+              {(c.stdout || c.stderr) && <details><summary>运行日志</summary><pre>{`stdout:\n${c.stdout}\nstderr:\n${c.stderr}`}</pre></details>}
+            </section>)}
+            <details><summary>版本证据</summary><pre>{`代码 SHA256：${r.code_hash}\n验证指纹：${r.fingerprint}`}</pre></details>
+          </details>)}
+          {snapshot.approvals.filter(a => a.draft_id === d.id).map(a => <div key={a.id}>{a.status === 'PENDING' ? <><p>已请求正式变更；暂不开放批准写入。</p><button disabled={pending} onClick={() => void action(`/approvals/${a.id}/decision`, { decision: 'reject', expected_revision: snapshot.session.revision })}>拒绝本次变更</button></> : <p className="muted">{a.status === 'REJECTED' ? '已拒绝，正式文件未改变' : a.status === 'STALE' ? '版本已变更，审批已过期' : '请求已取消'}</p>}</div>)}
         </section>)}
         {!!snapshot?.usage.length && <p className="muted">累计估算 / 预留 ¥{snapshot.usage.reduce((total, u) => total + u.cny, 0).toFixed(4)}{snapshot.usage.some(u => u.status === 'RESERVED_UNKNOWN') ? '（含用量未知请求）' : ''}</p>}
       </>}
