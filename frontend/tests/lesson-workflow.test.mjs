@@ -179,6 +179,32 @@ test('上一版本、其他教案和回退提交不能解锁当前版本下载',
   assert.equal(deliveryState(lesson, commits, []).committed, true)
 })
 
+test('本机交付后以工作区阅读为主，Web保留下载入口', () => {
+  const snapshot = fixture()
+  const lesson = snapshot.lessons[0]
+  lesson.delivery_ready = true
+  lesson.code_status = 'PASS'
+  snapshot.commits = [{ id: 'committed', status: 'COMMITTED', lesson_id: lesson.lesson_id, lesson_revision: lesson.revision }]
+  const props = { lesson, commits: snapshot.commits, approvals: [], busy: false, editing: false, onVerify: noop, onReview: noop, onOpenFiles: noop }
+  assert.match(render(DeliveryGuidance, { ...props, local: true }), /已保存到所选工作区，可直接开始阅读/)
+  assert.match(render(DeliveryGuidance, props), /可以下载教案包/)
+  const workspace = { snapshot, pending: false, act: noop, fail: noop, onOpenFiles: noop }
+  const localHtml = render(EducationWorkspace, { ...workspace, local: true })
+  assert.match(localHtml, /本机教案保存位置/)
+  assert.match(localHtml, /下载 ZIP（可选）/)
+  const webHtml = render(EducationWorkspace, workspace)
+  assert.doesNotMatch(webHtml, /本机教案保存位置/)
+  assert.match(webHtml, /下载教案包/)
+})
+
+test('本机尚未确认文件Diff不显示已保存入口', () => {
+  const snapshot = fixture()
+  snapshot.lessons[0].delivery_ready = true
+  const html = render(EducationWorkspace, { snapshot, local: true, pending: false, act: noop, fail: noop, onOpenFiles: noop })
+  assert.doesNotMatch(html, /本机教案保存位置/)
+  assert.match(html, /本版尚未正式交付/)
+})
+
 test('当前版本待审批时提供入口，其他版本审批不冒充本版完成', () => {
   const lesson = fixture().lessons[0]
   lesson.delivery_ready = true

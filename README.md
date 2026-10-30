@@ -4,7 +4,7 @@
 
 **Web 演示：[https://111.229.226.186](https://111.229.226.186)**。当前配置真实百炼 `qwen3.8-max`，已连接独立容器 Runner，非 Mock。演示只使用汇总/合成班情，不上传学生姓名、学号或真实学生代码。
 
-2026-10-30 交付修复已上线：`delivery-20261030050342-d490cddca8`。下载包新增6份可离线阅读/打印的HTML、独立学生练习与教师答案、易读逐用例报告；保留原始Python及可复用数据。全量后端284项（含42真实容器）、前端70项与构建通过；最终下载代码再次真实执行22条原/上界用例通过。功能提交`88e9774`已推送公开master，应用源码Hash与线上26模块及静态资源实测一致，详见验收第33节；完整证据见[验收第31节](docs/ACCEPTANCE.md#31-交付封闭离线教师包与最终复验2026-10-30)。真实教师专业审核、现场换机、视频成片/链接仍待完成。源码[GitHub仓库](https://github.com/chenxi1934/yunyun-ai-tutor)已公开并通过匿名访问核验。
+2026-10-30最终演示版本已上线：`desktop-final-20261030065947-61e1a28d55`。PC默认零Key/SSH、浏览器选择真实本地目录；审核确认后直接开始阅读。后端326项（含42真实容器）、前端72项与构建通过；干净包经正式HTTPS真实模型读取本地资料，17用例→故意超时阻断→同规格修复→审核落盘/21文件ZIP通过；旧Web生产主线也通过。准确范围见[验收第36节](docs/ACCEPTANCE.md#36-最终macos启动包与正式https闭环2026-10-30)。源码[GitHub仓库](https://github.com/chenxi1934/yunyun-ai-tutor)公开；最终SHA及包校验见交付包metadata。视频、真正现场换机和教师专业审核仍由本人完成。
 
 ## 安装
 
@@ -29,30 +29,21 @@ chmod 600 .env
 
 ## PC 一键运行
 
-在仓库外创建教师教学目录，放入 UTF-8 Markdown / TXT / JSON / CSV / Python 文件。
-
-本轮验证的是当前macOS arm64，用户已确认现场会换机器；现场须重新安装依赖/构建、配置密钥与SSH并完成真实主线，不能沿用本机PASS。Windows启动未验。
+**macOS启动包**：解压`耘耘AI助教-macOS一键启动.zip`后，双击`一键启动.command`；或在解压目录运行：
 
 ```bash
-# 已有本机私有Runner配置时
-bash scripts/start-desktop.sh --workspace /绝对路径/教师教学目录
-
-# 复用本项目服务器上的私有Runner，无需本机安装Docker
-# 密码登录示例：首次核对主机指纹，再输入密码；不将密码写进命令或文件
-mkdir -p .runtime
-ssh -M -S "$PWD/.runtime/ssh_control" -o ControlPersist=3600 \
-  -o UserKnownHostsFile="$PWD/.runtime/ssh_known_hosts" \
-  -o PreferredAuthentications=password -fN root@111.229.226.186
-# 也可使用已配置好的 SSH agent；普通一次性 SSH 登录不会保存后续脚本的鉴权
-bash scripts/start-desktop.sh \
-  --workspace /绝对路径/教师教学目录 --runner-ssh root@111.229.226.186
+bash scripts/start-easy.sh
 ```
 
-启动后自动打开浏览器。macOS 省略 `--workspace` 会弹出原生目录选择器；页面的“打开本地工作区”也可为新会话选择目录，旧会话继续绑定原目录。`--port 8001` 更换端口；`--no-browser` 供进程探针使用。原生选择器尚未人工验收，CLI指定真实目录已实际验证。
+首次联网自动准备项目内的uv、Python 3.12及Python依赖，不改全局Python/终端配置。启动包自带已构建界面，无需安装Node/npm、模型Key或SSH。源码克隆启动也用同一命令；缺少界面时会下载项目内官方Node并校验SHA256，再安装前端依赖构建。请保留终端，按Ctrl+C退出；重复启动复用环境和会话，不重复创建后台服务。`--check`仅准备环境/检查连接，`--port 8001`避开占用端口。
 
-本机服务只监听 loopback；能力口令通过 URL fragment 传入标签页，随即清除并保存在 sessionStorage，不进入日志。重启后通过启动入口重新打开页面以获得新口令，会话与历史继续保留。工作区不能包含应用数据库；密钥/隐藏文件、路径越界、符号/硬链接均拒绝。支持范围为教学文本，每文件64 KiB、最多200个可见文件。
+浏览器中填写教学目录的**完整路径**并点击“使用此目录”，或“浏览选择目录”。请选择仓库/解压目录外的真实教学文件夹，放入UTF-8教学材料。新会话绑定新目录，已有会话继续使用原目录。当前实际验证平台为macOS arm64；macOS Intel、Windows、Linux及真正面试现场换机未实测。电脑需要可访问官方依赖源和演示服务，首次准备耗时依赖网络；演示服务关闭后无法生成或验证，已有HTML仍可离线阅读。这是联网本机启动包，不是独立离线安装程序。
 
-`--runner-ssh` 仅经加密SSH读取私有Runner配置并建立权限受限的Unix socket转发，退出清理转发；不把Token打印或写入前端。未连接有效隔离器时，PC/Web均明确显示执行器不可用，禁止代码交付，不降级到宿主子进程。
+本机UI、API和Agent Core真实读取所选目录，草稿/Diff/审批及正式文件保留本机；发给模型的对话、汇总班情、工具读取结果经HTTPS演示代理送往百炼；候选Python代码和输入发往远端隔离Runner。模型Key只在服务器。请只使用合成或去标识的教学资料。默认演示地址为`https://111.229.226.186`，不能把启动包里的地址改成临时localhost转发。
+
+本机服务只监听loopback；变更需本机能力口令与同源校验。口令通过启动入口传入后立即从地址栏移除，不写日志/打包；重启后使用自动打开的新标签，旧会话和历史继续保留。教学目录不得包含应用数据库，路径越界、隐藏/凭据文件、链接均拒绝；教学文本每文件64KiB、最多200个可见文件。
+
+独立开发模式仍可运行`bash scripts/start-desktop.sh --workspace /绝对路径/教学目录`，按`.env.example`配置模型/本机私有Runner；或用`--runner-ssh root@111.229.226.186`复用私有Runner，须先自行完成主机指纹核验和SSH认证。该方式不适合作为发给面试官的默认配置。未连接真实隔离器时禁止代码交付，不降级到宿主子进程。
 
 ## 教师操作流程
 
@@ -60,7 +51,7 @@ bash scripts/start-desktop.sh \
 2. 查看对话和工具执行进度；右侧工作区按教案、示例代码、分层练习、错因预警展开。每条程序报告显示输入、期望、实际、stdout/stderr、退出码、耗时与Hash；失败不能接受或导出。
 3. 逐项接受、拒绝或继续修改；可编辑文字、代码与评分点。代码变更使旧PASS失效，重新运行后才能接受。历史版本可恢复为新草稿，重新验证/审核。
 4. 全部代码通过且全部教学项目接受后，点击“审核交付文件 Diff”。检查每个文件的新建/覆盖/删除、原Hash与新Hash，再“确认接受并写入”或拒绝。正式内容写入 `published/<lesson_id>/`；拒绝不改变文件字节。
-5. 下载ZIP后解压并双击“开始阅读.html”：离线查看教案、课堂示例、独立学生练习、教师答案与评分点、逐用例验证报告。学生只需“学生练习.html”，不要整包发放。保留5份Python代码及可选JSON/Markdown/测试规格/Hash清单和正式提交回执。文件被外部修改、教案/用例/报告变更、验证过期或审核撤销后，下载被阻断；更新导出格式后，旧交付也需重新审核文件Diff并确认，才能下载新格式。
+5. PC确认写入后，直接在保存位置卡片点击“开始阅读”或“打开文件夹”，无需再次下载/选择目录；文件位于所选工作区的`published/<lesson_id>/`。Web或需要转发时下载ZIP、解压并双击“开始阅读.html”：离线查看教案、课堂示例、独立学生练习、教师答案与评分点、逐用例验证报告。学生只需“学生练习.html”，不要整包发放。保留5份Python代码及可选JSON/Markdown/测试规格/Hash清单和正式提交回执。文件被外部修改、教案/用例/报告变更、验证过期或审核撤销后，下载被阻断；更新导出格式后，旧交付也需重新审核文件Diff并确认，才能下载新格式。
 
 模型若只回复文字而未生成教案，该次备课没有完成；以教案和真实报告为准。教材内的样本编号只是资料，模型误读时须明确澄清。连接/超时错误如实显示，可点击“继续当前任务”恢复；保留失败和未知usage，不将重试前的失败算作通过。
 
@@ -95,6 +86,8 @@ Manager镜像入口 `runner/Dockerfile`；只有可信Manager可访问Docker Soc
 
 每条用例在一次性非root容器运行：无网络、只读根、cap-drop=ALL、no-new-privileges、默认seccomp、0.5CPU、128MiB、32pids、16MiB tmpfs、单case2秒、整程序30秒、stdout/stderr各64KiB。可信外部比对stdout，不信任候选自报PASS；超时/取消回收容器，清理失败关闭Runner。模型Key、教师目录、数据库和其他会话文件不挂入候选。
 
+演示适配仅在Web显式设置`DEMO_GATEWAY_ENABLED=true`时启用`/api/demo/status`、`model`、`execute`。本次演示按所有者选择不设应用层鉴权；采用全局每分钟600/30/240次限流、模型/执行并发1、256KiB请求体、65/10秒上限及原容器隔离。执行与Web共享原执行锁，忙时明确拒绝；不能读取服务器文件、发管理命令或提供expected。保持原Web会话归属/审批认证。面试验证结束后由所有者关闭演示服务；未设自动关闭时间。
+
 ## API 要点
 
 所有资源校验cookie归属、Host/Origin；PC变更另需本机能力口令。变更带 `expected_revision`；聊天另带幂等键。模型工具不包含教师批准/正式提交能力。
@@ -111,6 +104,7 @@ Manager镜像入口 `runner/Dockerfile`；只有可信Manager可访问Docker Soc
 | `POST .../lessons/{lid}/delivery` | 生成精确文件Diff与待审批快照，暂不写入 |
 | `POST /api/approvals/{aid}/decision` | `{decision: approve/reject,expected_revision}`；再次核对版本/Hash/验证与审核 |
 | `GET .../lessons/{lid}/package` | 仅下载当前仍有效的正式提交ZIP |
+| `GET .../lessons/{lid}/local-package`、`POST .../local-package/open` | PC已审核材料的实际保存路径/受限原生打开，无重复写入 |
 | `POST .../drafts`、`POST .../publish-draft` | 文件草稿；请求单文件正式审批 |
 | `POST .../commits/{cid}/restore-draft` | 已完成提交生成回退Diff，须再次审核；未解决中断不可走此入口 |
 | `GET .../commits/{cid}/recovery` | 中断对账：返回每项 BEFORE/AFTER/UNCHANGED/CONFLICT、现状Hash/权限、回退Diff、snapshot_hash及允许操作 |

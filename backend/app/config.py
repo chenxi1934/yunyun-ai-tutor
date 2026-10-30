@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     yunyun_secure_cookie: bool = False
     runner_socket: Path | None = None
     runner_token: SecretStr = SecretStr("")
+    # 可选演示适配；默认不改变现有Web/独立PC调用链。
+    desktop_gateway_url: str | None = None
+    demo_gateway_enabled: bool = False
     model_timeout_seconds: float = Field(default=60, gt=0, le=60)
     # 更换模型必须显式核对价格；不能沿用旗舰价格冒充精确账单。
     llm_input_cny_per_million: float | None = Field(default=None, gt=0)

@@ -21,19 +21,23 @@ def main():
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--no-browser', action='store_true')
     parser.add_argument('--runner-ssh', help='可选：连接已部署的私有Runner，使用SSH agent或已有控制连接')
+    parser.add_argument('--gateway-url', help='可选：演示服务HTTPS地址；模型Key仅留在服务器')
     args = parser.parse_args()
-    if args.workspace is None:
+    if args.workspace is None and not args.gateway_url:
         if sys.platform != 'darwin':
             parser.error('请使用 --workspace 选择真实教学目录。')
         selected = subprocess.run(['osascript', '-e', 'POSIX path of (choose folder with prompt "选择教师教学工作区")'], capture_output=True, text=True)
         if selected.returncode:
             parser.exit(message='已取消选择工作区。\n')
         args.workspace = Path(selected.stdout.strip())
-    if args.workspace.is_symlink() or not args.workspace.is_dir():
+    if args.workspace is not None and (args.workspace.is_symlink() or not args.workspace.is_dir()):
         parser.error('--workspace 必须指向已有的真实教学目录。')
     token = secrets.token_urlsafe(32)
-    settings = Settings(yunyun_mode='pc', yunyun_workspace=args.workspace.resolve(),
+    settings = Settings(yunyun_mode='pc', yunyun_workspace=args.workspace.resolve() if args.workspace else None,
+                        desktop_gateway_url=args.gateway_url,
                         yunyun_local_token=SecretStr(token))
+    if args.gateway_url:
+        settings.llm_provider = 'bailian'
     tunnel = None
     with tempfile.TemporaryDirectory(prefix='yy-pc-', dir='/tmp') as temporary:
         try:

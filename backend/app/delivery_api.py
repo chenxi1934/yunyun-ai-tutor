@@ -31,6 +31,14 @@ class Reconcile(Revision):
     decision: Literal['accept', 'reject', 'rollback']
 
 
+class LocalDirectory(StrictModel):
+    path: str = Field(min_length=1, max_length=4096)
+
+
+class LocalOpen(StrictModel):
+    target: Literal['read', 'folder']
+
+
 def register_delivery(app, agent, session, result, execution_lock):
     store, delivery = agent.store, agent.delivery
 
@@ -55,6 +63,26 @@ def register_delivery(app, agent, session, result, execution_lock):
         with store.tx():
             agent.verification.refresh(sid, identity)
 
+    def bind_directory(value):
+        from pathlib import Path
+        if agent.settings.yunyun_mode != 'pc':
+            raise AppError('LOCAL_ONLY', '只能在本机工作台选择教学目录。', 403)
+        root = Path(value).expanduser()
+        if not root.is_absolute():
+            raise AppError('WORKSPACE_DENIED', '请填写教学目录的完整路径。', 422)
+        if root.is_symlink() or not root.is_dir():
+            raise AppError('WORKSPACE_DENIED', '请选择已存在的真实教学目录。', 409)
+        root = root.resolve()
+        data = agent.settings.yunyun_data_dir.resolve()
+        if data == root or data.is_relative_to(root):
+            raise AppError('WORKSPACE_DENIED', '教学目录不能包含应用运行数据，请在项目目录外选择。', 403)
+        agent.settings.yunyun_workspace = root
+        return root.name
+
+    @app.post('/api/local-workspace/select')
+    async def select_directory(request: Request, body: LocalDirectory):
+        return result(request, {'workspace_name': bind_directory(body.path)})
+
     @app.post('/api/local-workspace/dialog')
     async def choose(request: Request):
         if agent.settings.yunyun_mode != 'pc' or sys.platform != 'darwin':
@@ -68,15 +96,7 @@ def register_delivery(app, agent, session, result, execution_lock):
             raise AppError('DIALOG_CANCELLED', '选择目录超时，请重试。', 409) from None
         if selected.returncode:
             raise AppError('DIALOG_CANCELLED', '已取消选择，原工作区保留。', 409)
-        from pathlib import Path
-        root = Path(selected.stdout.strip())
-        if root.is_symlink() or not root.is_dir():
-            raise AppError('WORKSPACE_DENIED', '请选择真实目录。', 403)
-        data = agent.settings.yunyun_data_dir.resolve()
-        if data == root.resolve() or data.is_relative_to(root.resolve()):
-            raise AppError('WORKSPACE_DENIED', '工作区不能包含应用数据库。', 403)
-        agent.settings.yunyun_workspace = root.resolve()
-        return result(request, {'workspace_name': root.name})
+        return result(request, {'workspace_name': bind_directory(selected.stdout.strip())})
 
     @app.post('/api/sessions/{sid}/drafts')
     async def draft(request: Request, sid: str, body: DraftRequest):
@@ -154,3 +174,40 @@ def register_delivery(app, agent, session, result, execution_lock):
         content = delivery.archive(value, lid)
         return Response(content, media_type='application/zip',
                         headers={'Content-Disposition': 'attachment; filename="lesson-package.zip"'})
+
+    async def local_package(request, sid, lid):
+        from pathlib import Path
+        if agent.settings.yunyun_mode != 'pc':
+            raise AppError('LOCAL_ONLY', '此入口仅供本机工作台使用。', 403)
+        value = session(request, sid)
+        await refresh(sid)
+        # 复用下载的完整验证/审批/文件Hash闸口，不复制或再次写入任何文件。
+        delivery.archive(value, lid)
+        workspace = agent.workspace(value)
+        relative = f'published/{lid}/开始阅读.html'
+        workspace.read(relative)
+        target = workspace.root / relative
+        if target.resolve(strict=True) != target.absolute():
+            raise AppError('PATH_DENIED', '交付目录已变化，请重新核对工作区。', 409)
+        return {'directory': str(target.parent), 'entry': str(target),
+                'relative_directory': str(Path(relative).parent)}
+
+    @app.get('/api/sessions/{sid}/lessons/{lid}/local-package')
+    async def local_package_location(request: Request, sid: str, lid: str):
+        return result(request, await local_package(request, sid, lid))
+
+    @app.post('/api/sessions/{sid}/lessons/{lid}/local-package/open')
+    async def open_local_package(request: Request, sid: str, lid: str, body: LocalOpen):
+        if sys.platform != 'darwin':
+            raise AppError('LOCAL_ONLY', '当前平台请按显示的保存路径打开教案。', 403)
+        location = await local_package(request, sid, lid)
+        # 路径只由已审批教案和当前会话推导，不接受调用者传入路径或命令。
+        command = ['/usr/bin/open', *(['-R'] if body.target == 'folder' else []), location['entry']]
+        try:
+            opened = await asyncio.to_thread(subprocess.run, command, capture_output=True,
+                                            text=True, timeout=10, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            raise AppError('LOCAL_OPEN_FAILED', '未能打开，请使用显示的保存路径手动打开；文件已保留。', 503) from None
+        if opened.returncode:
+            raise AppError('LOCAL_OPEN_FAILED', '未能打开，请使用显示的保存路径手动打开；文件已保留。', 503)
+        return result(request, {'opened': body.target, **location})

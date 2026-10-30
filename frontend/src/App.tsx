@@ -58,6 +58,7 @@ export default function App() {
   const [draftNotice, setDraftNotice] = useState<{ id: string; text: string }>()
   const [requestPrefilled, setRequestPrefilled] = useState(false)
   const [newPath, setNewPath] = useState('')
+  const [localDirectory, setLocalDirectory] = useState('')
   const [stage, setStage] = useState('初中')
   const [grade, setGrade] = useState('初二')
   const [topic, setTopic] = useState('循环结构')
@@ -190,6 +191,7 @@ export default function App() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (runtime?.mode === 'pc' && !runtime.workspace_name && !sid) { setError('请先点击“打开本地工作区”选择教学目录。'); return }
     if (!text.trim()) { messageRef.current?.focus(); return }
     if (uploadError) { setError(uploadError); return }
     let scope = currentScope()
@@ -301,6 +303,20 @@ export default function App() {
     messageRef.current?.focus()
   }
 
+  function chooseLocalWorkspace() {
+    const scope = currentScope()
+    setPending(true); void api<{workspace_name: string}>('/local-workspace/dialog', {}).then(r => {
+      if (isCurrent(scope)) { selectSession(undefined); setRuntime({...runtime!, workspace_name: r.workspace_name}) }
+    }).catch(e => {if(isCurrent(scope)) setError(e.message)}).finally(() => {if(isCurrent(scope)) setPending(false)})
+  }
+
+  function openLocalDirectory() {
+    const scope = currentScope()
+    setPending(true); void api<{workspace_name: string}>('/local-workspace/select', {path:localDirectory.trim()}).then(r => {
+      if(isCurrent(scope)) { selectSession(undefined); setRuntime({...runtime!,workspace_name:r.workspace_name});setError('') }
+    }).catch(e => {if(isCurrent(scope))setError(e.message)}).finally(()=>{if(isCurrent(scope))setPending(false)})
+  }
+
   return <div className="app-shell">
     <a className="skip-link" href="#conversation">跳到备课对话</a>
     <aside className="sidebar" aria-label="备课会话">
@@ -308,12 +324,7 @@ export default function App() {
       <button className="new-session" onClick={() => {
         selectSession(undefined)
       }}><Plus size={16} aria-hidden="true" />新建备课会话</button>
-      {runtime?.mode === 'pc' && <button disabled={pending} onClick={() => {
-        const scope = currentScope()
-        setPending(true); void api<{workspace_name: string}>('/local-workspace/dialog', {}).then(r => {
-          if (isCurrent(scope)) { selectSession(undefined); setRuntime({...runtime, workspace_name: r.workspace_name}) }
-        }).catch(e => {if(isCurrent(scope)) setError(e.message)}).finally(() => {if(isCurrent(scope)) setPending(false)})
-      }}><FolderOpen size={15}/>打开本地工作区</button>}
+      {runtime?.mode === 'pc' && <button disabled={pending} onClick={chooseLocalWorkspace}><FolderOpen size={15}/>打开本地工作区</button>}
       <h2>最近会话</h2>
       <nav aria-label="历史会话">{sessions.length ? [...sessions].reverse().map(s =>
         <button className={sid === s.id ? 'session selected' : 'session'} key={s.id} aria-current={sid === s.id ? 'page' : undefined}
@@ -329,7 +340,13 @@ export default function App() {
         <button className="subtle" onClick={() => setShowWorkspace(v => !v)} aria-expanded={showWorkspace}><FolderOpen size={16} aria-hidden="true" />工作区</button>
       </header>
       <div className="notice">先验证代码，再逐项审核教学内容，最后确认文件差异并交付。</div>
-      {runtime && !runtime.mock && !runtime.key_configured && <p className="alert" role="alert">未配置百炼密钥，请完成本地配置并重启服务。</p>}
+      {runtime && !runtime.mock && !runtime.key_configured && <p className="alert" role="alert">模型服务未就绪，请检查启动提示和网络后重试。</p>}
+      {runtime?.mode === 'pc' && !sid && <section className="notice" aria-label="本机教学目录">
+        <p>{runtime.workspace_name ? `当前目录：${runtime.workspace_name}。可为新会话更换目录。` : '先设置本机教学目录，助教才能读取资料和提交经你确认的修改。'}</p>
+        <label>教学目录完整路径<input value={localDirectory} placeholder="例如 /Users/你的用户名/Documents/备课" onChange={e=>setLocalDirectory(e.target.value)}/></label>
+        <button type="button" disabled={pending || !localDirectory.trim()} onClick={openLocalDirectory}>使用此目录</button>
+        <button type="button" disabled={pending} onClick={chooseLocalWorkspace}>浏览选择目录</button>
+      </section>}
       {error && <div className="alert" role="alert">{error}{!connected && <button onClick={() => void connect()}>重新连接</button>}</div>}
       {pending && <p className="notice" role="status" aria-live="polite">{activity || '正在处理，请稍候…'}</p>}
       <div className="chat-scroll">
@@ -376,7 +393,7 @@ export default function App() {
         {requestPrefilled && <p className="request-prefill" role="status">原备课需求已带入，尚未发送。请补充要处理的文件及修改要求，再点击发送需求。</p>}
         <label htmlFor="request">备课需求</label><textarea ref={messageRef} id="request" name="request" autoComplete="off" value={text} maxLength={12000} onChange={e => { setText(e.target.value); setRequestPrefilled(false) }}
           placeholder={sid ? '补充教学要求或明确班情，例如：另有8人出现边界错误，请加强边界练习…' : '全班40人，5人未交、3人while死循环，刚学完条件语句。请备一节45分钟《循环结构》，包含示例与分层练习并真实验证代码…'} rows={sid ? 1 : 3} />
-        <div className="composer-footer"><small>{sid ? '会话已保存，可从历史继续' : '将创建独立的备课会话'}</small><button className="primary" type="submit" disabled={!connected || blocked}><ArrowUp size={16} aria-hidden="true" />{pending ? '处理中…' : '发送需求'}</button></div>
+        <div className="composer-footer"><small>{sid ? '会话已保存，可从历史继续' : '将创建独立的备课会话'}</small><button className="primary" type="submit" disabled={!connected || blocked || (runtime?.mode === 'pc' && !runtime.workspace_name && !sid)}><ArrowUp size={16} aria-hidden="true" />{pending ? '处理中…' : '发送需求'}</button></div>
       </form>
     </main>
 
@@ -384,7 +401,7 @@ export default function App() {
       <h2><FolderOpen size={17} aria-hidden="true" />{snapshot?.workspace_name || '备课工作区'}</h2>
       <div className="workspace-tabs" aria-label="工作区视图">{['备课产物','文件与Diff'].map(name => <button aria-pressed={panel===name} key={name} onClick={() => setPanel(name)}>{name}</button>)}</div>
       {!sid || !snapshot ? <p className="muted">{sid ? '正在读取工作区…' : '发起任务后查看文件与修改草稿。'}</p> : <>
-        {panel === '备课产物' ? <EducationWorkspace key={sid} snapshot={snapshot!} pending={blocked} act={action} onOpenFiles={() => setPanel('文件与Diff')} fail={message => { if(isCurrent(renderScope)) setError(message) }}/> : <>
+        {panel === '备课产物' ? <EducationWorkspace key={sid} local={runtime?.mode === 'pc'} snapshot={snapshot!} pending={blocked} act={action} onOpenFiles={() => setPanel('文件与Diff')} fail={message => { if(isCurrent(renderScope)) setError(message) }}/> : <>
         <WorkspaceFiles files={files} selected={file?.path} disabled={loadingFile} onSelect={path => {
           const scope = currentScope(), fileEpoch = ++fileGeneration.current
           setLoadingFile(true); setFile(undefined); setFileEdit(undefined)

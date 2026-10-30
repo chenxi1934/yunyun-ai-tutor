@@ -7,10 +7,11 @@ import DiffView from './DiffView'
 import { lessonSections, reviewCounts, sourceLabel, teachingTitle, MisconceptionReferences } from './LessonStructure'
 import ReviewActions from './ReviewActions'
 import DeliveryGuidance, { deliveryState } from './DeliveryGuidance'
+import LocalDelivery from './LocalDelivery'
 
 export { Report } from './VerificationDiagnostic'
 
-type Props = { snapshot: Snapshot; pending: boolean; act: (path: string, body: unknown, method?: string) => Promise<boolean>; fail: (message: string) => void; onOpenFiles: () => void }
+type Props = { snapshot: Snapshot; pending: boolean; local?: boolean; act: (path: string, body: unknown, method?: string) => Promise<boolean>; fail: (message: string) => void; onOpenFiles: () => void }
 function ItemEditor({ item, save, cancel, pending }: {item: TeachingItem; save: (item: TeachingItem) => void; cancel: () => void; pending: boolean}) {
   const [value, setValue] = useState(item)
   useEffect(() => {
@@ -28,7 +29,7 @@ function ItemEditor({ item, save, cancel, pending }: {item: TeachingItem; save: 
   </fieldset></form>
 }
 
-export default function EducationWorkspace({snapshot, pending, act, fail, onOpenFiles}: Props) {
+export default function EducationWorkspace({snapshot, pending, local = false, act, fail, onOpenFiles}: Props) {
   const lesson = snapshot.lessons.at(-1)
   const [tab, setTab] = useState('教案')
   const [editing, setEditing] = useState<string>()
@@ -100,8 +101,9 @@ export default function EducationWorkspace({snapshot, pending, act, fail, onOpen
     <div className="lesson-heading"><div><h3>{lesson.plan.stage} · {lesson.plan.topic}</h3><p className="muted">45分钟 · 教案版本 {lesson.revision}</p></div><span className={`status ${!verifying && lesson.code_status === 'PASS' ? 'success' : ''}`}>{verifying ? '代码验证中…' : lesson.code_status === 'PASS' ? '代码 PASS' : '代码待验证'}</span></div>
     <div className="review-progress" role="status">已接受 {totals.accepted} · 已拒绝 {totals.rejected} · 待审核 {totals.pending} / 共 {Object.keys(lesson.items).length} 项{lesson.profile_stale ? ' · 班情已更新，请重新备课' : ''}</div>
     <div className="actions"><button disabled={pending || verifying} onClick={() => void verify()}><Play size={14} aria-hidden="true" />{verifying ? '正在测试…' : '运行全部代码测试'}</button><button aria-describedby="delivery-diff-hint" disabled={pending || !lesson.delivery_ready} onClick={() => void act(base + '/delivery', {expected_revision: snapshot.session.revision})}>审核交付文件 Diff</button>
-      <button aria-describedby="delivery-package-hint" disabled={pending || downloading || !lesson.delivery_ready || !delivery.committed} onClick={() => {setDownloading(true); void download(base + '/package', '循环结构-教案包.zip').catch(e => fail(e.message)).finally(() => setDownloading(false))}}><Download size={14}/>{downloading ? '正在打包下载…' : '下载教案包'}</button></div>
-    <DeliveryGuidance lesson={lesson} commits={snapshot.commits} approvals={snapshot.approvals} busy={pending || verifying} editing={!!editing} onVerify={() => void verify()} onReview={openReview} onOpenFiles={onOpenFiles} />
+      <button aria-describedby="delivery-package-hint" disabled={pending || downloading || !lesson.delivery_ready || !delivery.committed} onClick={() => {setDownloading(true); void download(base + '/package', '循环结构-教案包.zip').catch(e => fail(e.message)).finally(() => setDownloading(false))}}><Download size={14}/>{downloading ? '正在打包下载…' : local ? '下载 ZIP（可选）' : '下载教案包'}</button></div>
+    <DeliveryGuidance local={local} lesson={lesson} commits={snapshot.commits} approvals={snapshot.approvals} busy={pending || verifying} editing={!!editing} onVerify={() => void verify()} onReview={openReview} onOpenFiles={onOpenFiles} />
+    {local && lesson.delivery_ready && delivery.committed && !delivery.recoveryRequired && <LocalDelivery key={`${lesson.lesson_id}:${lesson.revision}:${snapshot.commits.at(-1)?.id}`} base={base} busy={pending || verifying} />}
     {downloading && <p role="status" aria-live="polite">正在打包下载教案，请稍候…</p>}
     <VerificationFeedback lesson={lesson} reports={snapshot.verification_reports} phase={currentVerification?.phase} error={currentVerification?.error} completedAt={currentVerification?.completedAt} navigationBlocked={!!editing} onOpen={(name, itemId) => { setTab(name); setReportTarget({ id: itemId, report: true }) }} />
     {!!lesson.curriculum_risks.length && <div className="alert">{lesson.curriculum_risks.map((risk, index) => {

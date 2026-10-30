@@ -98,4 +98,7 @@ class MockProvider:
 
 
 def create_provider(settings: Settings) -> Provider:
+    if settings.yunyun_mode == 'pc' and settings.desktop_gateway_url:
+        from app.demo_gateway import DemoProvider
+        return DemoProvider(settings.desktop_gateway_url)
     return MockProvider() if settings.llm_provider == "mock" else BailianProvider(settings)

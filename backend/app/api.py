@@ -12,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.agent import Agent
 from app.config import PROJECT_ROOT, Settings
 from app.delivery_api import register_delivery
+from app.demo_gateway import register_demo_gateway
 from app.domain import AppError, Decision, NewMessage, NewSession, Resume, dumps, sha, uid
 from app.education.api import register_education
 from app.providers import Provider
@@ -121,6 +122,7 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
 
     register_education(app, agent, session, result, execution_lock)
     register_delivery(app, agent, session, result, execution_lock)
+    register_demo_gateway(app, agent, execution_lock)
 
     @app.get("/api/health")
     async def health(request: Request):
@@ -134,11 +136,14 @@ def create_app(settings: Settings | None = None, provider: Provider | None = Non
 
     @app.get("/api/runtime")
     async def runtime(request: Request):
+        identity = await runner_identity()
+        remote = settings.yunyun_mode == 'pc' and bool(settings.desktop_gateway_url)
         return result(request, {"mode": settings.yunyun_mode, "provider": settings.llm_provider,
-                                "model": "MOCK_LLM" if settings.llm_provider == "mock" else settings.llm_model,
-                                "mock": settings.llm_provider == "mock",
-                                "key_configured": bool(settings.dashscope_api_key.get_secret_value()),
-                                "runner": "ISOLATED" if await runner_identity() else "UNAVAILABLE", "publish": "AVAILABLE", "workspace_name": settings.yunyun_workspace.name if settings.yunyun_workspace else None})
+                                "model": (identity or {}).get('model', settings.llm_model) if remote else
+                                         "MOCK_LLM" if settings.llm_provider == "mock" else settings.llm_model,
+                                "mock": (identity or {}).get('mock', False) if remote else settings.llm_provider == "mock",
+                                "key_configured": (identity or {}).get('model_ready', False) if remote else bool(settings.dashscope_api_key.get_secret_value()),
+                                "runner": "ISOLATED" if identity else "UNAVAILABLE", "publish": "AVAILABLE", "workspace_name": settings.yunyun_workspace.name if settings.yunyun_workspace else None})
 
     @app.post("/api/client")
     async def client(request: Request):

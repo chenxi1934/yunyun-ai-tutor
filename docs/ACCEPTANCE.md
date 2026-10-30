@@ -711,3 +711,27 @@ UAT-004/005 为体验优化，UAT-006 为实际复现的 Diff 数据格式 Bug�
 线上无需重复部署：当前`delivery-20261030050342-d490cddca8`的全部应用源码清单Hash与该提交逐文件相同，26实际模块、当前公网静态资源及HTTPS/healthy再次核对PASS。镜像Git标签仍记录构建时基线f449592及工作区快照，不能把该旧标签说成最新提交；真实源码清单Hash `d490cddca8420186c613ac3d337d1b4dfc68c8f848a7ccb6599c40269044ec8c`与提交对应才是本次证据。保留录屏环境运行，不重启。证据`.runtime/closure-committed-live.json`。后续文档补记提交只改变README/验收/进度，不改变已验证应用代码；最终分支HEAD和源码包元数据以本次最终回读为准。
 
 剩余完整交付条件收敛为视频成片/链接、真正现场机器启动、教师专业审核；Git公开与同步已完成。源码ZIP将在最终文档提交后刷新，保留当前完整普通Git历史且不包含.env/运行数据。
+
+
+## 34. 本机验收入口生命周期恢复（2026-10-30）
+
+PASS：原51006连接拒绝定位到临时脚本10分钟自动退出，沿用原包/数据库/端口/候选网关恢复；恢复前后全部SQLite逻辑记录一致；原任务COMPLETED且5程序17用例报告保留；health/runtime HTTP200，Chrome原session events HTTP200、text/event-stream；后台监管进程无自动到期时间且工具返回后仍运行，模型调用0。证据`.runtime/demo-ui-restored.json`、`demo-ui-recovery-before.sqlite3`及恢复日志（均Git忽略，不含新增凭据）。本项没有改SSE或生产服务。B候选核心真实链路及309项回归已另有运行证据，但后续目录填写改动未完整复验，整个B版本仍NOT_TESTED；用户继续手动验收期间其余变更/部署暂停。
+
+
+## 35. PC复用已交付目录直接阅读（本地候选）
+
+PASS（协议/构建）：`python -m pytest backend/tests/unit/test_local_delivery.py backend/tests/unit/test_export_documents.py backend/tests/integration/test_delivery.py -q`为22项；`node --test frontend/tests/*.test.mjs`72项；`npm --prefix frontend run build`、定向Ruff、git diff检查通过。`scripts/test-local-delivery-browser.cjs`独立HTTP夹具/Chrome4项，覆盖PC路径与受限打开请求、失败重试、Web保持下载、未确认Diff不得显示已保存入口；长路径390px不溢出，截图已查看。文件被改/删除/链接、报告变化、未审核/未提交、错误owner/缺本机口令/跨站/额外路径字段均阻止打开；重复调用不写文件、无新提交。附件由Library官方流程物化后实际查看，当前工作区已有20个文件/6HTML。
+
+NOT_TESTED：当前51006加载新界面与macOS实际打开操作（尚未重启，不扰用户现场）；本轮不替代B方案的最终整包/生产回归。未新增磁盘ZIP副本，正式材料仍仅由原Diff审批写入。证据`.runtime/local-delivery-tests.log`、`local-delivery-ui-tests.log`、`local-delivery-build.log`、`local-delivery-browser.json`及截图。当前改动未经本请求单独push批准，未提交推送。
+
+
+## 36. 最终macOS启动包与正式HTTPS闭环（2026-10-30）
+
+- PASS：最终`desktop-final-tests.py`全量326项/42真实容器；原始XML `.runtime/desktop-final-tests.xml`，268.93秒。前端72项、TypeScript/Vite、全仓Ruff、bash语法、git diff检查通过。目录边界及本机交付安全测试均为协议夹具，不作真实Runner证据。Chrome4项本机/Web入口与失败/未交付/390px长路径回归。
+- PASS：macOS arm64从无.env/Key/SSH/Node/Python3.12的解压包，PATH=/usr/bin:/bin，默认正式HTTPS冷启动准备28.61秒/重复1.05秒；真实启动runtime非Mock且ISOLATED；重复实例/占用端口/不可达明确失败，Ctrl+C退出释放端口，教学与会话保留。源码无Node时官方Node下载/SHA256/构建26.51秒通过。证据`desktop-final-cold.json`、`desktop-node-fallback.json`。Windows/macOS Intel/Linux及真正面试换机NOT_TESTED。
+- PASS：生产发布`desktop-final-20261030065947-61e1a28d55`，Hash `61e1a28d55fdbadb52d75369b7976572ca06c900ef2f2201215997cfad1fc9d3`；27实际模块和公网静态资源匹配，TLS正常，Key不出服务器。新增演示flag仅通过容器环境覆盖，原runtime.env不改；默认路由关闭，当前按用户明确选择启用无应用鉴权演示，保留请求限流/并发/体积/超时/隔离。数据/配置/Runner及432份原文件在切换前后一致，备份与旧容器`yunyun-api-rollback-desktop-final-20261030065947-61e1a28d55`保留。候选读取25班情/41教案，真实三场景51用例、新旧草稿6用例通过。生产回滚切回NOT_TESTED。证据`desktop-final-deploy.json`及`desktop-final-live-verification.json`。
+- PASS：干净解压包的项目内Python环境经**正式HTTPS**，浏览器同接口选本地目录→真实模型读取随机标记并调用工具→5程序17条真实用例→故意TIMEOUT/导出409→同冻结规格修复→合成逐项审阅→Diff拒绝无写入→确认20份本地正式文件→21文件ZIP/CRC/manifest/本地字节一致→实际保存位置/SSE检查，6次真实模型调用。本机无Key/SSH、无临时候选转发。证据`desktop-final-pc-core.json`及生成/超时/最终快照。合成审核不代替教师教育判断。
+- PASS：正式Web独立合成会话95018c9eec174cd8976dc7bd70855607，经旧接口真实TIMEOUT/409→原规格修复17用例→拒绝/确认/21文件ZIP→HTML/学生答案隔离/代码/manifest检查，模型调用0。证据`desktop-final-web-driver.log`和`desktop-final-web/after-live-state.json`。不删除既有会话数据。
+- PASS/边界：51006原DB重启/转正式HTTPS前后全部逻辑记录一致，持久后台进程无自动到期，无SSH依赖；开始阅读/打开文件夹真实POST200，创建正确标题本地HTML标签，无重复写入。浏览器file协议正文观察被明确策略拒绝，Finder视觉因Mac锁屏受阻，未绕过，二者视觉均NOT_TESTED。设计PDF由当前MD更新，PDFKit1页/1324字符、渲染已查看。
+
+剩余人工项：≤5分钟真实演示视频（必须包含故意失败）、面试现场机器预演、教师专业审查与邮件正式提交。GitHub Actions未配置，不声称CI PASS；本轮Git授权已明确，最终分支/完整SHA和包清单以delivery-metadata.json为准。

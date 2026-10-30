@@ -39,6 +39,9 @@ class Agent:
         self.provider = provider or create_provider(settings)
         self.verification = VerificationService(store, RemoteRunner(
             settings.runner_socket, settings.runner_token.get_secret_value()))
+        if settings.yunyun_mode == 'pc' and settings.desktop_gateway_url:
+            from app.demo_gateway import DemoRunner
+            self.verification.runner = DemoRunner(settings.desktop_gateway_url)
         self.education = EducationService(store, self.verification)
         self.delivery = DeliveryService(self)
         self.registry = Registry(store, self.verification, self.education, self.delivery)
@@ -77,7 +80,8 @@ class Agent:
 
     def _config(self) -> dict:
         return {"provider": self.settings.llm_provider, "model": self.settings.llm_model,
-                "endpoint_hash": sha(self.settings.dashscope_base_url),
+                "endpoint_hash": sha(self.settings.desktop_gateway_url if self.settings.yunyun_mode == 'pc'
+                                     and self.settings.desktop_gateway_url else self.settings.dashscope_base_url),
                 "price_override": [self.settings.llm_input_cny_per_million,
                                    self.settings.llm_output_cny_per_million],
                 "limits": {"model_timeout_seconds": self.settings.model_timeout_seconds},
