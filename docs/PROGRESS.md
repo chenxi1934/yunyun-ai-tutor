@@ -645,3 +645,12 @@ Firefox在本机macOS图形子进程启动失败（sandbox extension / framebuff
 A将标题与状态/审阅操作放在同一行，标题左、控件右，统一24px/11px紧凑风格；B按用户补充收敛为一个会话的一份本班班情，移除A/B快捷填充和观察计数，保留输入/上传/模板和历史。C定位为旧文件基准冲突与内容已一致被混同，新增具体路径/最新Diff及后端生成新草稿入口，复用Registry验证权限、冻结规格与教案绑定；可完整回填首条教师需求，但不覆盖未发送文字、不自动发送。D为执行记录提供独立限高滚动和区域外标题，随实际对话区高度调整。
 
 后端定向225项PASS（11.54秒），前端70项纯函数/SSR PASS；TypeScript/Vite构建1847模块，改动Ruff/脚本语法/Git差异检查PASS。新增文件冲突接口专项10项，前置7项功能断言先失败后通过；没有弱化测试、改变系统/模型工具schema或生产配置。用户已明确授权四项完成后提交部署，准备沿用候选隔离验收、备份、切换和公网Hash核验流程。未启动本地服务/浏览器，本版本真实Runner与发布结果后记，浏览器交互和真实模型生成仍NOT_TESTED。
+
+
+## 2026-10-30：ABCD已提交、部署并完成隔离验收
+
+功能提交`587d7607213668f275ad795a7b8b69731652b177`，发布`uat-abcd-20261030035314-4e90678c15`，源码清单Hash `4e90678c15edd39891bd480011abbaa4c418e148e56ba6f01fee5aa5d6b8218f`。从干净Git工作区打包已提交应用文件；只更新API/React，保留原Runner、配置和Nginx/证书。切换前隔离验证旧数据21份班情/34条教案、三场景15份代码51用例与合成教学/文件审核/导出/回退。新增C端到端机制通过：进程内HTTP冲突→重建不落盘→确认写入→内容已一致不重复提交；同一候选的新旧Python草稿实际验证两次共6用例，规格与候选不变，新稿需真实执行后才恢复PASS。
+
+公网正常TLS、API healthy、百炼qwen3.8-max非Mock/Runner ISOLATED、新恢复接口可用、25个安装模块及index/JS/CSS三份资源Hash一致。生产全部SQLite逻辑记录Hash、19会话/15任务/23提交/75条usage、334个工作区文件Hash相同；旧API回退容器与停机备份保留。付费模型调用0，合成审核不作为专业教师证据；浏览器对齐/滚动/回填与生产切回仍NOT_TESTED。
+
+证据：`.runtime/uat-followup-regression.xml`、`uat-followup-deploy.json`、`uat-followup-deploy-source.json`、`uat-followup-deploy-build.log`、`uat-followup-live-verification.json`，均Git忽略。此前证据未覆盖；当前功能代码已部署，最后补记仅更新文档，无需再次发布应用；Git仅本地提交、未推送。

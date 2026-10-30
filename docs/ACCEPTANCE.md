@@ -648,3 +648,21 @@ UAT-004/005 为体验优化，UAT-006 为实际复现的 Diff 数据格式 Bug�
 ```
 
 新恢复接口是教师操作入口，不增加模型工具。首条教师需求只在明确点击后完整回填，用户继续编辑后手动发送；普通文本文件冲突可直接生成新稿。真实文件校验、Python重新测试、教案稳定绑定、逐项审批及正式写入确认保留。用户手动步骤和原因见UAT-014～017。历史UAT-001～013发布证据保持原状。
+
+
+## 30. ABCD增量发布与文件冲突真实隔离验收（2026-10-30）
+
+功能提交`587d7607213668f275ad795a7b8b69731652b177`；发布`uat-abcd-20261030035314-4e90678c15`，已提交应用文件清单Hash `4e90678c15edd39891bd480011abbaa4c418e148e56ba6f01fee5aa5d6b8218f`。按用户本轮明确授权在全部本地检查后提交，再完成候选验证、备份和切换，最后补记文档；未推送Git。
+
+| 检查 | 状态 | 本版本实际证据与边界 |
+|---|---|---|
+| 本地回归与构建 | PASS | 第29节后端225项、前端70项、TypeScript/Vite1847模块；Ruff、脚本语法和Git差异检查通过，不作为浏览器证据 |
+| 旧数据兼容 | PASS，范围有限 | 候选镜像在生产数据库独立副本读取21份ClassProfile、34条LessonPlan，不改原记录 |
+| 三条教育/交付流程 | PASS，合成决策 | 初中A/B与大学各5份程序，分别17/18/16用例，共15份/51用例由真实隔离Runner执行，实际输出/退出码/清理证据通过；合成逐项审核、Diff接受/拒绝、ZIP Hash与文件回退通过，不替代教师专业审核 |
+| 新文件冲突接口流程 | PASS | 候选容器临时数据中以TestClient验证旧基准失败包含路径与当前差异、保留候选生成新版本但不写正式文件、明确审批后写入、内容相同再请求不重复提交。没有生产POST或付费模型调用 |
+| 新Python草稿的真实验证 | PASS | 同一候选更新文件基准前后各真实执行一次，共6条冻结用例；候选内容和规格不变，新ID初始NOT_TESTED且不能审批，重新真实执行后才PASS。实际输出/exit_code=0/清理证据通过；确认审批动作为合成 |
+| 公网版本与接口 | PASS | `.venv/bin/python .runtime/verify-uat-followup-live.py`验证HTTPS证书、healthy、bailian/qwen3.8-max、mock=false、Runner ISOLATED；25安装模块Hash与提交清单相同，公网index/JS/CSS三份Hash与镜像相同；模板下载及新恢复接口OpenAPI可用 |
+| 数据、配置、恢复准备 | PASS，未切回演练 | 全部生产SQLite逻辑记录Hash不变，19会话/15任务/23提交/75条usage不变；334个工作区文件Hash不变。Runner容器/镜像、runtime.env Hash与系统/工具策略Hash保持原值。保留旧API及停机备份；生产切回仍NOT_TESTED |
+| 实际用户体验 | NOT_TESTED | 遵守约定，未启动本地服务或浏览器；A同行/紧凑样式、B单份班情、C回填焦点和点击时序、D滚动/标题/窗口调整仍待用户按UAT步骤确认。未调用真实模型生成或进行教师专业审核 |
+
+证据：`.runtime/uat-followup-regression.xml`、`.runtime/uat-followup-deploy.json`、`.runtime/uat-followup-deploy-source.json`、`.runtime/uat-followup-deploy-build.log`、`.runtime/uat-followup-live-verification.json`（本机Git忽略）；备份位于`/opt/yunyun-tutor/releases/uat-abcd-20261030035314-4e90678c15/`。合成探针数据在候选容器临时目录清理，公网核验仅GET。前轮UAT-001～013及其失败历史保留，当前ABCD已部署，用户体验确认待进行；文档补记未改应用源码。
