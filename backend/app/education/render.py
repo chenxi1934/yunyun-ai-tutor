@@ -1,6 +1,7 @@
 import json
 
 from app.domain import dumps, sha
+from app.education.documents import documents
 
 
 def readable_source(ref):
@@ -14,8 +15,9 @@ def readable_source(ref):
 def render_files(view, reports):
     """生成经审核的内容快照；提交记录由DeliveryService独立产生。"""
     plan = view['plan']
-    lines = [f"# {plan['stage']}《{plan['topic']}》", '', '课时：45分钟。教师已逐项审核；正式写入状态以提交记录为准。', '',
+    lines = [f"# {plan['stage']} {view['profile']['grade']}《{plan['topic']}》", '', '课时：45分钟。教师已逐项审核；正式写入状态以提交记录为准。', '',
              '代码PASS只适用于所列固定用例；教学正确性由教师审核。', '']
+    lines += ['前置知识：' + '、'.join(plan['prerequisites']), '']
     overview = {item['kind']: item for item in plan.get('overview', [])}
     lines += ['## 一、教学内容分析', '', overview.get('content', {}).get('content', '本历史版本未包含此分析。'), '',
               '## 二、学情分析', '', overview.get('learners', {}).get('content', '本历史版本未包含此分析。'), '']
@@ -41,7 +43,8 @@ def render_files(view, reports):
             path = f"code/{item['id']}.py"
             files[path] = item['code']
             files[f"tests/{item['id']}.json"] = json.dumps(info['test_spec'], ensure_ascii=False, indent=2)
-            lines += [f"### {item['title']}", '', info['contract']['task_contract'], '',
+            label = item.get('level', '示例') + ' · ' + item['title']
+            lines += [f"### {label}", '', info['contract']['task_contract'], '',
                       item.get('prompt', item['explanation']), '', item.get('scaffolding', ''), '',
                       f"参考代码：{path}；当前验证：PASS；审核：ACCEPTED。", '']
             if group == 'exercises':
@@ -59,7 +62,9 @@ def render_files(view, reports):
     files['lesson.json'] = json.dumps(view, ensure_ascii=False, indent=2)
     files['lesson.md'] = '\n'.join(lines) + '\n'
     files['reports.json'] = json.dumps(reports, ensure_ascii=False, indent=2)
+    files.update(documents(view, reports, readable_source))
     files['manifest.json'] = dumps({'schema_version': 1, 'lesson_id': view['lesson_id'],
-        'revision': view['revision'], 'kind': 'teacher_reviewed_draft', 'formal_file_changed': False,
+        'revision': view['revision'], 'kind': 'teacher_reviewed_content_snapshot',
+        'publication_status_source': 'delivery-receipt.json',
         'files': {path: sha(content) for path, content in files.items()}})
     return {'kind': 'teacher_reviewed_draft', 'files': files, 'formal_file_changed': False}

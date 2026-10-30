@@ -336,5 +336,12 @@ class EducationService:
         if not view['delivery_ready']:
             raise AppError('EDUCATION_REVIEW_REQUIRED', '须全部代码通过、无超纲风险且教师逐项接受后才可导出。', 409)
         from app.education.render import render_files
-        reports = [r for r in self.store.find('reports', sid) if r['draft_id'] in view['bindings'].values()]
+        # 仅取当前草稿的最后一份有效报告；历史失败留在会话历史，不混入正式材料。
+        reports = []
+        current_reports = {r['draft_id']: r for r in self.store.find('reports', sid)}
+        for item in [*view['plan']['examples'], *view['plan']['exercises']]:
+            info = view['items'][item['id']]
+            if sha(item['code']) != info['code_hash']:
+                raise AppError('HASH_MISMATCH', '教学代码与验证快照不一致，请重新验证和审核。', 409)
+            reports.append(current_reports[info['draft_id']])
         return render_files(view, reports)

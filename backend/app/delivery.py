@@ -233,6 +233,7 @@ class DeliveryService:
         commit = {'id': uid(), 'session_id': session['id'], 'approval_id': approval['id'],
             'status': 'APPLYING', 'created_at': now(), 'entries': entries,
             'lesson_id': approval.get('lesson_id'), 'lesson_revision': approval.get('lesson_revision'),
+            'lesson_hash': approval.get('lesson_hash'),
             'applied': []}
         with self.store.tx():
             self.store.put('commits', commit)
@@ -374,6 +375,16 @@ class DeliveryService:
         if not commits:
             raise AppError('COMMIT_REQUIRED', '请先查看文件Diff并确认正式交付。', 409)
         commit = commits[-1]
+        # 下载的是确定的审批快照；用例/报告/渲染格式改变后必须重新确认Diff。
+        expected = self.agent.education.export(session['id'], lid)['files']
+        prefix = f'published/{lid}/'
+        entries = commit['entries']
+        if (len(entries) != len(expected) or
+                {e['path']: e['content_hash'] for e in entries} !=
+                {prefix + path: sha(content) for path, content in expected.items()} or
+                self.store.get('approvals', commit['approval_id']).get('lesson_hash') != view['content_hash']):
+            raise AppError('DELIVERY_SNAPSHOT_STALE',
+                           '交付快照与当前材料、用例或报告不一致，请重新审核交付文件Diff后下载。', 409)
         ws, buffer = self.agent.workspace(session), io.BytesIO()
         with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
             archive.writestr('delivery-receipt.json', dumps({'kind': 'teacher_reviewed_package',
@@ -384,5 +395,5 @@ class DeliveryService:
                 current = ws.read(entry['path'])
                 if current['hash'] != entry['content_hash']:
                     raise AppError('REVISION_CONFLICT', '交付文件已被外部修改，请重新交付。', 409)
-                archive.writestr(entry['path'].split('/', 2)[-1], current['content'])
+                archive.writestr(entry['path'][len(prefix):], current['content'])
         return buffer.getvalue()

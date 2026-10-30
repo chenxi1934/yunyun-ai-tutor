@@ -1,6 +1,6 @@
 # P0 与交付验收矩阵
 
-**修订日期：2026-10-30。最新干净环境交付检查见第20节。用户已废止全部模型调用预算限制，移除与复验结果见第19节。第18节及更早预算/失败记录仅为历史证据，不是当前规则。教师专业审核、换机现场、视频与最终Git同步仍未完成；原工作目录.env权限0644待人工收紧。**
+**修订日期：2026-10-30。最新导出交付修复见第31节；干净环境交付检查见第20节。用户已废止全部模型调用预算限制，移除与复验结果见第19节。更早预算/失败记录为历史证据。教师专业审核、换机现场、视频与最终Git同步仍未完成；本地.env已收紧为0600。**
 
 架构、协议、阶段和部署闸口见 [PLAN.md](PLAN.md)，实际执行记录见 [PROGRESS.md](PROGRESS.md)。历史文档/环境检查不能充当产品能力证据；各阶段证据仅适用于其记录的源码与范围。
 
@@ -666,3 +666,42 @@ UAT-004/005 为体验优化，UAT-006 为实际复现的 Diff 数据格式 Bug�
 | 实际用户体验 | NOT_TESTED | 遵守约定，未启动本地服务或浏览器；A同行/紧凑样式、B单份班情、C回填焦点和点击时序、D滚动/标题/窗口调整仍待用户按UAT步骤确认。未调用真实模型生成或进行教师专业审核 |
 
 证据：`.runtime/uat-followup-regression.xml`、`.runtime/uat-followup-deploy.json`、`.runtime/uat-followup-deploy-source.json`、`.runtime/uat-followup-deploy-build.log`、`.runtime/uat-followup-live-verification.json`（本机Git忽略）；备份位于`/opt/yunyun-tutor/releases/uat-abcd-20261030035314-4e90678c15/`。合成探针数据在候选容器临时目录清理，公网核验仅GET。前轮UAT-001～013及其失败历史保留，当前ABCD已部署，用户体验确认待进行；文档补记未改应用源码。
+
+
+## 31. 交付封闭：离线教师包与最终复验（2026-10-30）
+
+**当前可录屏版本已上线；完整面试交付仍未全部完成。** 原题以`INTERVIEW_REQUIREMENTS.md`为准：Web URL、PC可运行/真实落盘、≤5分钟视频（须拍故意失败）、Git源码历史、一页判断文档；PDF/PPT不是额外硬要求。通过Codex会话工具读取本项目列出的12个本地会话及全部较早轮次，未读取其他项目正文或底层会话存储。接续中断的导出任务，保留并完成原有两处未提交改动；无其他活动本项目本地任务。进程表受系统限制不可读，未绕过。
+
+新增`education/documents.py`及9项回归：同一审核快照生成6份独立离线HTML，学生版无答案/评分解析或资源依赖，保留原始5份.py与可选技术JSON。当前报告与审核/提交快照重新核对，历史失败留在会话历史；manifest只描述内容快照，正式状态由delivery receipt表达。源教案、题目、参考解、保护用例、模型/系统策略未改写，无新依赖或迁移。旧交付须重新确认文件Diff后取得新格式。
+
+| 检查 | 结果 | 实际证据与范围 |
+|---|---|---|
+| 全量后端 | PASS | `.venv/bin/python .runtime/closure-full-tests.py`：284 passed，0失败/错误/跳过，268.11秒；242项受控协议/单元/接口，42项真实容器。通过临时SSH Unix socket复用现有Runner，Token仅在进程内。新增9项先发现审批Hash读取位置错误，修复后全过，未弱化断言 |
+| 前端与静态检查 | PASS | `node --test --test-reporter=dot frontend/tests/*.test.mjs`：70项；`npm --prefix frontend run build`：TypeScript/Vite1847模块；`.venv/bin/ruff check backend runner scripts`、`git diff --check`通过。依赖已有弃用提醒未当成产品失败，也未升级无关依赖 |
+| 实际浏览器 | PASS，范围明确 | 现有React HTTP夹具Chrome/WebKit22项；公网Chrome页面/HTTPS/runtime无JS错误。最终下载解压的6份HTML由Chrome断网file模式打开、实际跳转、390px宽度/打印检查并查看截图；学生文件独立无答案链接。WebKit file模式内部错误，NOT_TESTED，未绕过安全设置。没有把界面夹具当真实模型/Runner |
+| 候选隔离与兼容 | PASS | 初中A/B及大学，15程序/51用例真实执行；旧数据读取与合成拒绝/修订/恢复/审核/正式Diff/ZIP/文件回退通过；另新旧Python草稿2次/6用例。审核为合成动作，不是教师专业批准；模型调用0 |
+| 新版公网闭环 | PASS，合成输入 | 新会话81239c590dc542cbbdce53a7a18bcd84：真实while死循环TIMEOUT→export 409→恢复原代码、冻结规格不变→5程序17用例真实通过→19项合成审核→Diff拒绝不写入→确认写入→下载21文件。包内6 HTML、5 Python、9 JSON、1 Markdown；CRC、目录安全、manifest Hash、代码/报告/版本、学生版隔离逐项核对。实际解压文件位于`.runtime/export-audit/after/` |
+| 最终下载代码再次运行 | PASS | `.venv/bin/python .runtime/reexecute-export.py`直接读取最终ZIP代码，私有受限Runner重跑17条原用例和5条独立最大输入补充用例，共22条；实际stdout/exit_code/隔离/清理证据通过。补充用例不修改产品保护规格，正式报告仍只宣称其原17用例 |
+| 发布与数据保护 | PASS | 发布`delivery-20261030050342-d490cddca8`；源码清单Hash`d490cddca8420186c613ac3d337d1b4dfc68c8f848a7ccb6599c40269044ec8c`；26实际安装模块及公网index/JS/CSS Hash全部一致，TLS正常校验，bailian/qwen3.8-max非Mock、Runner ISOLATED。发布前后所有SQLite逻辑记录Hash相同：21会话/15任务/25提交/75 usage，376原文件Hash不变；配置与Runner镜像/容器保留。此计数包含发布前独立合成验收；发布后又新增1份合成验收会话，没有修改既有会话 |
+| 回滚准备 | PASS，切回未演练 | 旧API保留为`yunyun-api-rollback-delivery-20261030050342-d490cddca8`；`/opt/yunyun-tutor/releases/delivery-20261030050342-d490cddca8`有SQLite和数据停机备份。正式生产切回仍NOT_TESTED |
+| 秘密与交付访问 | PASS / FAIL分列 | 当前123份源码及409个可达Git对象均未发现本地已知模型Key/服务器密码；`.env`0600，环境/运行数据不进入源码包。GitHub配置地址匿名GET返回404（FAIL），无法作为已确认的面试方访问链接。未提交/推送Git；当前应用发布明确绑定工作区快照Hash，不冒充已提交版本 |
+
+证据（均Git忽略、不含凭据）：`.runtime/closure-all-tests.xml`、`closure-full-tests.log`、`closure-ui.json`、`closure-public-browser.json`、`closure-deploy.json`、`closure-deploy-source.json`、`closure-live-verification.json`、`export-audit/after-live-state.json`、`export-audit/after-deploy.zip`、`export-audit/browser-check-final.json`、`export-audit/reexecuted-final-code.json`。本轮未调用付费模型；此前真实模型工具闭环证据保留，不能把本轮模板/合成输入说成新模型生成质量验收。
+
+**剩余交付条件**：用户录制并核对≤300秒成片/上传链接；真正现场机器启动；真实教师复核教学适配与文字；源码仓库外部访问/最终同步。原生目录选择、Windows、Firefox、未来证书续期及生产切回未验。现有任务工具无切换/验证Fast档位的接口，未声称开启。当前可开始熟悉和录屏，使用`DEMO_SCRIPT.md`；向面试官正式提交仍由用户把关。
+
+公开前只读复查：唯一remote为`origin → chenxi1934/yunyun-ai-tutor`，URL无内嵌凭据。当前123文件与409个可达Git对象扫描未发现真实已知Key/密码、私钥、常见Token或邮箱/手机号/身份证候选；未发现.env/私钥/数据库敏感路径。种子/测试为标注的合成班情，参考截图未见学生记录或凭据。上述是检查范围内无命中，不保证不存在所有类型的敏感内容。按用户新增要求，仓库改公开由父任务统一协调，本地任务不并发变更可见性。
+
+
+## 32. GitHub公开与交付包复查（2026-10-30）
+
+按用户明确要求及父任务移交，先用本机既有gh认证回读目标`chenxi1934/yunyun-ai-tutor`：PRIVATE且ADMIN。只执行该仓库可见性变更，随后`gh repo view ... --json visibility,isPrivate`确认PUBLIC、isPrivate=false；匿名HTTPS GET仓库返回200。没有Git提交、推送或更改其他权限。第31节404是公开前状态，当前访问已修复，源码最终同步仍待授权。
+
+复查源码ZIP：CRC正常，123文件与内部manifest Hash一致；无.env、私钥、运行数据库、.runtime、node_modules或.venv；已含当前documents/render/service/delivery/workspaces及新增导出测试的全部未提交修复，另保留普通Git历史bundle和差异补丁。包只代表当前源码快照，不声称未提交修复已在远端。
+
+演示URL匿名GET与runtime均200，无跳转登录要求；默认TLS信任/主机校验通过，证书有效至2026-11-05 06:07:48 UTC（北京时间14:07:48）。此前独立Chrome实际页面成功渲染、无JS异常，未忽略证书错误或绕过安全警告。这是当前网络/浏览器的实际结果，不保证其他网络环境。证据`.runtime/closure-public-access.json`。首轮匿名核验驱动误调用httpx URL属性中止，修正驱动后完成上述核验，未改产品。
+
+
+## 33. 最终源码提交与公开仓库同步（2026-10-30）
+
+用户明确授权将最新验收交付修复提交并推送到`chenxi1934/yunyun-ai-tutor`。只纳入教师离线导出、快照校验、9项回归和相关交付文档，保留已有历史；`.env`、运行数据及凭据排除。提交前确认远端默认分支master，远端SHA `118e84c83c07ab6c9a0826d3d2d18ddd4a00e9ea`为本地祖先；公开状态PUBLIC。仓库Actions工作流数量为0，不标记CI通过；实际本地284项后端、70项前端、构建和浏览器证据仍见第31节。提交/推送及线上模块Hash对应的实际结果将在本节后续补记。

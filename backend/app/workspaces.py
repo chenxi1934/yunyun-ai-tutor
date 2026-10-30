@@ -12,7 +12,7 @@ def is_python_path(path: str) -> bool:
 class Workspace:
     """所有用户文件读取使用目录句柄逐段打开，拒绝链接和私有路径。"""
 
-    suffixes = {".md", ".txt", ".json", ".csv", ".py"}
+    suffixes = {".md", ".txt", ".json", ".csv", ".py", ".html"}
     max_bytes = 65536
 
     def __init__(self, root: str | Path, identity: tuple[int, int] | None = None):
