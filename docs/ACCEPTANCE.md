@@ -610,3 +610,23 @@ UAT-004/005 为体验优化，UAT-006 为实际复现的 Diff 数据格式 Bug�
 ```
 
 首次额外指定importlib模式因已有测试直接导入conftest而收集失败；使用仓库默认模式后上述215项通过。未弱化原断言；兼容旧上下文窗口的压缩夹具保留原阈值，新增丰富教案场景。无新增数据库迁移或生产配置变更，依赖仍仅UAT-001已授权的Markdown依赖与锁文件。未启动本地服务或浏览器；交互手动步骤见UAT记录。
+
+
+## 28. UAT-001～013 增量发布与隔离验收（2026-10-30）
+
+用户明确授权“都完成后提交Git，部署线上环境”。功能提交`60606c979f6db803e54bd6b7f417e8559c6fa545`；发布版本`uat-20261030031906-47c92d696d`，应用源码清单Hash `47c92d696da5b141b2da4c14d597c97d0b711624e558dd13f6c69b59311db31a`。从干净工作区仅打包Git已提交应用文件，构建标记绑定提交/清单，不包含环境、运行目录或凭据。首次SSH认证失败未改变服务器；恢复连接后完成发布。
+
+| 检查 | 状态 | 当前版本实际证据 |
+|---|---|---|
+| 本地回归/构建 | PASS | 第27节215项定向后端、60项前端组件；TypeScript/Vite1845模块；改动Ruff、脚本语法、Git差异检查通过 |
+| 旧数据读取 | PASS，范围有限 | 新候选容器读取独立数据库副本的21份ClassProfile和34条LessonPlan记录，模型兼容校验通过，未改写生产记录 |
+| 真实隔离执行 | PASS | 初中A、初中B、大学各5程序，分别17/18/16用例，合计15程序/51用例；逐项实际输出等于冻结期望、exit_code=0、容器清理证据为真。模型为显式Mock且未调用，Runner为现有真实隔离执行器 |
+| 教学与文件机制 | PASS，合成决策 | 独立临时数据中三场景验证19项结构、拒绝保留、编辑/恢复为待审新版本、旧代码证据继续有效、未审导出阻止、合成逐项接受、正式Diff拒绝/写入、ZIP内容Hash、文件回退；不冒充教师专业审核 |
+| 生产数据与配置 | PASS | 发布前后全部SQLite逻辑记录Hash一致；19会话、15任务、23提交、75条usage相同；334个原工作区文件Hash一致。Runner容器ID与镜像、runtime.env Hash保持原值，不改Nginx/证书/生产配置 |
+| 公网与实际代码 | PASS | `.venv/bin/python .runtime/verify-uat-live.py`：正常TLS证书验证，API healthy；bailian/qwen3.8-max、mock=false、Runner ISOLATED；25个实际安装模块Hash等于提交清单，公网index.html/JS/CSS三份Hash等于镜像；CSV/JSON模板下载通过，系统/工具策略Hash仍相同 |
+| 部署回退准备 | PASS，未演练切回 | 发布目录保留`state-before.sqlite3`和`data-before.tar.gz`，旧API停止并保留为回退容器。生产实际切回NOT_TESTED；不把合成文件回退等同服务器回退演练 |
+| 用户体验与教育质量 | NOT_TESTED | 未启动浏览器或本地服务；实际布局、滚动/折叠、操作焦点与时序需按UAT手动步骤确认；本轮未调用真实模型生成教案，教师专业审核仍未完成 |
+
+证据（本机Git忽略）：`.runtime/uat-regression.xml`、`.runtime/uat-deploy.json`、`.runtime/uat-deploy-source.json`、`.runtime/uat-deploy-build.log`、`.runtime/uat-live-verification.json`。服务器备份位于`/opt/yunyun-tutor/releases/uat-20261030031906-47c92d696d/`。全部合成验证数据在候选容器临时目录内清理；公网核验仅GET，不新增生产会话，付费模型调用为0。
+
+当前状态：UAT-001～013代码已部署，待用户线上确认；Git仅本地提交，未推送。本节发布后补记只涉及文档，线上应用源码仍对应功能提交60606c9；不改变之前失败记录和完整面试验收未完成项。

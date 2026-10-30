@@ -627,3 +627,14 @@ Firefox在本机macOS图形子进程启动失败（sandbox extension / framebuff
 实际定向后端 **215 PASS（11.27秒）**；前端 **60 PASS**（19项新工作流+41项既有回归），为纯函数/SSR；Ruff与两份浏览器脚本语法检查PASS。首次尝试pytest importlib模式因现有conftest导入方式收集失败，改用项目默认模式后完整定向集通过，未修改断言或pytest配置。旧窗口压缩回归保留原16k～24k断言，另测丰富教案大于24k场景。线上与本地系统/工具策略Hash实测一致，未改变已有恢复配置。
 
 用户最新已授权提交Git和部署；准备沿用增量API/前端发布，保留原Runner、运行配置、会话与工作区，实际发布后另记证据。当前尚未进行本版浏览器、真实模型或真实Runner验收；教师专业审核保持NOT_TESTED。分类、原因、具体文件及用户手动步骤见 [UAT_ISSUES.md](UAT_ISSUES.md)。
+
+
+## 2026-10-30：UAT-001～013 已提交并上线
+
+按用户明确授权将本阶段35个文件提交为`60606c9`，再从干净Git工作区打包已提交应用源码，发布`uat-20261030031906-47c92d696d`；源码清单Hash为`47c92d696da5b141b2da4c14d597c97d0b711624e558dd13f6c69b59311db31a`。只更换API/React镜像，保留既有Runner、运行配置、Nginx/证书和数据。首次SSH认证失败发生在任何服务器变更前，恢复认证后正常发布；凭据未写入代码或配置。
+
+切换前候选容器在独立数据中成功读取21份旧班情、34条旧教案；初中A/B和大学各5份程序，合计15份/51用例由真实隔离Runner执行PASS，检查实际输出、退出码和清理证据。三场景还覆盖拒绝→修订→恢复、新结构19项的合成审阅、Diff拒绝/写入、ZIP清单Hash及文件回退，付费模型调用0。审核为自动化合成动作，教师教育判断不计PASS。
+
+停机备份后切换，生产全部SQLite逻辑记录Hash一致，19会话/15任务/23提交/75条usage不变，334个原工作区文件Hash一致；保留备份和旧API回退容器。公网HTTPS证书校验、健康状态、百炼qwen3.8-max非Mock/Runner ISOLATED、25个实际导入模块和index/JS/CSS三份静态资源Hash均PASS；新CSV/JSON模板公开下载PASS。线上只读核验未创建生产会话，未进行浏览器或真实模型生成验收，未演练生产切回。
+
+证据：`.runtime/uat-regression.xml`、`uat-deploy.json`、`uat-deploy-source.json`、`uat-deploy-build.log`、`uat-live-verification.json`（均Git忽略，不含凭据）；具体边界见ACCEPTANCE第28节。功能已部署，用户体验确认、教师专业审核仍待进行；本地Git提交未推送，发布后只补记文档不再重启服务。
