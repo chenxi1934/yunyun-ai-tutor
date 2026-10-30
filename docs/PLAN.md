@@ -1,6 +1,6 @@
 # 架构与实施计划
 
-**设计日期：2026-10-29（Asia/Shanghai）。状态：本轮设计完成，待人工复核；业务实现尚未开始。**
+**初始设计日期：2026-10-29（Asia/Shanghai）；2026-10-30用户要求删除全部模型预算约束。架构历史说明保留，当前实现与验收以PROGRESS/ACCEPTANCE最新节为准。**
 
 本轮修改 PLAN、ACCEPTANCE、PROGRESS，并按用户追加要求为 DESIGN_DECISIONS 补充简短产品交互说明。下文的模块、接口、命令和阈值均为实施契约，不代表已有源码或已通过测试。功能验收的实际状态以 [ACCEPTANCE.md](ACCEPTANCE.md) 为准。
 
@@ -11,7 +11,7 @@
 - PC 使用本机 FastAPI 服务与浏览器 GUI，首个支持平台为当前 macOS arm64；Web 复用同一套界面与 Agent Core。Windows 打包、Electron/Tauri 不进入本轮交付范围。
 - 教育内容以版本化 JSON 为事实源，Markdown/Python/ZIP 为派生产物；执行报告只由真实 Runner 产生，正式写入只由审批服务授权。
 - “代码在这些用例下通过”“教学适合这个班”“教师同意正式发布”分别记录，不能互相替代。未测试、失败、超时、执行器不可用均阻断正式教案包交付。
-- 不做账号注册/付费、学生端聊天、完整 IDE、教务对接、多语言执行、移动端和视觉打磨。公开演示仍需最小会话隔离与费用限额，不引入账号体系。
+- 不做账号注册/付费、学生端聊天、完整 IDE、教务对接、多语言执行、移动端和视觉打磨。公开演示保留最小会话隔离，不引入账号体系。
 - 题目收到时间与真实截止时刻未提供；以下 0–48h 为工作预算，不能据此声称截止时间或已耗时。
 
 ## 1. 原题覆盖与首个验收场景
@@ -58,7 +58,7 @@ flowchart TD
 | 拟建模块 | 职责与明确边界 |
 |---|---|
 | `backend/app/domain/` | Pydantic 教育/工作区/会话协议、状态机和不变量；不依赖 GUI 或部署模式 |
-| `backend/app/agent/` | Loop、上下文组装、预算、checkpoint；不能直接写正式文件或执行任意 shell |
+| `backend/app/agent/` | Loop、上下文组装、用量记录、checkpoint；不能直接写正式文件或执行任意 shell |
 | `backend/app/providers/` | API 差异、原生 tool_calls、用量和错误归一化；密钥只留服务端 |
 | `backend/app/tools/` | 工具 schema/handler/policy；输入校验、审计、幂等键；不接受模型自报权限 |
 | `backend/app/workspaces/` | Local/Sandbox 适配、路径安全、草稿、快照、受审批约束的提交 |
@@ -90,7 +90,7 @@ SQLite 放宿主应用数据目录（Web 为专用持久卷），不暴露为模
 | 已选平台/初始模型 | 阿里云百炼兼容 Chat Completions；按用户要求采用旗舰档 `qwen3.8-max`，阶段 02 先关闭 thinking 验证工具协议，模型 ID 可配置 | [官方模型目录](https://help.aliyun.com/zh/model-studio/models)将该模型用于复杂推理与编程；[Function Calling 文档](https://help.aliyun.com/zh/model-studio/qwen-function-calling)列出 Qwen3.8-Max 支持原生工具调用 | 本地安全配置凭据，实际确认账户模型权限、余额/限流、usage、工具调用往返；其他百炼模型启用前分别验证 |
 | 演示降级 | `MockProvider` | 固定响应，界面、事件、导出元数据显著带 `MOCK_LLM` | 不满足 A4；Runner 仍必须真实执行，禁止 Mock 报告 |
 
-用户指定 base_url 为 `https://dashscope.aliyuncs.com/compatible-mode/v1`。阶段 02 拟用 `LLM_PROVIDER=bailian`、`DASHSCOPE_BASE_URL`、`DASHSCOPE_API_KEY`、`LLM_MODEL` 配置平台、地址、凭据和模型；不因选择模型新增一套 Agent Core，也不默认开放所有模型。只记录非敏感的配置约定，密钥不进入文档、源码或 Git；本轮不写 `.env`。模型切换仍须满足原生 tool calling、结构校验与预算要求。
+用户指定 base_url 为 `https://dashscope.aliyuncs.com/compatible-mode/v1`。阶段 02 拟用 `LLM_PROVIDER=bailian`、`DASHSCOPE_BASE_URL`、`DASHSCOPE_API_KEY`、`LLM_MODEL` 配置平台、地址、凭据和模型；不因选择模型新增一套 Agent Core，也不默认开放所有模型。只记录非敏感的配置约定，密钥不进入文档、源码或 Git；本轮不写 `.env`。模型切换仍须满足原生 tool calling、结构校验要求。
 
 2026-10-29 核对的[百炼北京地域实时原价](https://help.aliyun.com/zh/model-studio/model-pricing)：`qwen3.8-max` 输入 ¥12/百万 token、输出 ¥36/百万 token。沿用单 run 与项目费用上限，不因升级旗舰模型自动扩额；账户权限、优惠与实际消耗尚未验证。
 
@@ -117,34 +117,32 @@ P0 先用非流式模型响应，SSE 流式展示工具/验证进度；不向用
 
 ### 4.1 执行顺序
 
-1. 保存教师消息、workspace/profile/revision、Provider/工具/策略版本与当前预算，创建 run 幂等键。
+1. 保存教师消息、workspace/profile/revision、Provider/工具/策略版本与调用记录，创建 run 幂等键。
 2. 组装稳定前缀（角色规则、工具 schema、课程约束）和可变上下文（事实、版本指针、消息、真实工具结果）；调用真实 Provider。
 3. 保存 assistant 消息与完整 tool_calls；按返回顺序串行校验、执行，不并发产生文件副作用。未知工具/无效参数作为错误结果回传，不能“猜着执行”。
 4. 每次真实工具完成即事务保存结果、事件与 checkpoint，追加匹配 call ID 的 tool 消息；同一批调用全部获得结果后才再次请求模型。模型据失败报告提出修复；Workflow 仅约束权限与交付，不用固定生成流水线冒充模型选择工具。
-5. 遇到待审批，先保存当前 call、未执行列表、审批快照和预算，再进入 `WAITING_APPROVAL`，不继续向模型请求。逐项接受只改变审核状态；教师最终确认且提交服务完成操作后，才回填原 call 的执行结果；拒绝则回填 `APPROVAL_DENIED`。未执行调用恢复时重新校验依赖，整批结果齐全后恢复模型推理。
+5. 遇到待审批，先保存当前 call、未执行列表、审批快照和调用记录，再进入 `WAITING_APPROVAL`，不继续向模型请求。逐项接受只改变审核状态；教师最终确认且提交服务完成操作后，才回填原 call 的执行结果；拒绝则回填 `APPROVAL_DENIED`。未执行调用恢复时重新校验依赖，整批结果齐全后恢复模型推理。
 6. 模型无工具调用并给出最终消息时结束本轮。服务端仍独立判断结果为草稿/验证失败/待审核/已提交；文本“全部完成”不能提升任何状态。
 
-Run 状态：`READY → RUNNING → WAITING_APPROVAL / COMPLETED / FAILED / STOPPED / INTERRUPTED`。教师取消、限额到达和无进展均是有原因的 STOPPED；执行器故障是 FAILED，不能被转成 PASS。等待审批不消耗主动运行时间，但不能重置累计预算。
+Run 状态：`READY → RUNNING → WAITING_APPROVAL / COMPLETED / FAILED / STOPPED / INTERRUPTED`。教师取消和无进展均是有原因的 STOPPED；执行器故障是 FAILED，不能被转成 PASS。等待审批暂停后续推理；调用次数与耗时只作追溯。
 
-### 4.2 首版硬限制（实施后用真实耗时校准，不能运行中擅自放宽）
+### 4.2 调用记录与执行保护（2026-10-30按用户要求修订）
 
-| 维度 | 默认上限与处理 |
+应用不设置模型费用、累计输入/输出Token、模型步数、工具总次数、累计运行时长或单次输出Token预算，不做预扣或未知费用预留。Provider不发送max_tokens/max_completion_tokens。真实用量与已知价格只用于记录；未知价格/用量如实标识，不阻断调用。此前相关限制要求已删除。
+
+| 执行保护 | 当前行为 |
 |---|---|
-| 一次教师请求 | 最多 12 次模型请求、24 个工具调用、主动运行 12 分钟；任一到限即 checkpoint 并停止 |
-| 模型请求 | 单次 60 秒、单次最多 4,096 输出 token；累计输入 80,000 / 输出 12,000 token，含重试与压缩消耗 |
-| 网络重试 | 仅限流/暂时性网络错误最多 2 次、短退避；鉴权/不支持工具立即报错；所有尝试计数，超时可能已计费需预留费用 |
-| 代码自动修复 | 每个 artifact 初次验证后最多修复 2 次；只能改候选代码；3 次连续无进展错误或重复同参数/同 hash 立即停止 |
-| 费用 | 建议单 run 估算上限 ¥3，项目调用累计 ¥45 停止，保留 ¥5 现场余量；人工建议预算合计不超过 ¥50 |
-| 执行资源 | 单用例墙钟 2 秒、单程序整套 30 秒；stdout/stderr 各最多 64 KiB，超限明确失败 |
-
-费用计算在请求前按当前 model/地域的经核对价格与最大输出预留，请求后用 usage 结算；没有可靠价格或 usage 则保留保守估算和未知标识，不声称账单精确。预算在 SQLite 原子扣减，恢复/重试/换 Provider 不能清零。除演示实例全局限额外，Web 每会话也有独立限额。
+| 单次模型请求 | 超时60秒，暂时性网络错误最多重试2次；鉴权/协议错误明确失败，不切Mock |
+| 无进展与代码修复 | 连续重复无进展停止；同一代码至多2次自动修复，不能更改冻结规格 |
+| 工具与代码运行 | 工具各有独立超时；代码用例2秒/程序30秒、CPU/内存/pids/输出/路径与网络隔离保持 |
+| 教师控制 | 可取消任务，正式写入仍需精确Diff审核；不会因取消删除历史 |
 
 ### 4.3 持久化与上下文
 
 - SQLite 表按 session/run/message/tool_call/event/artifact_revision/test_spec/report/approval/workspace_revision/usage 分责，单库本机持久化；消息、事件序号、状态迁移在同一事务提交。
-- 保存会话实际配置、原始工具消息及 call ID、草稿/文件 hash、冻结测试规格、验证报告、待审批列表、预算、工作区绑定与最近成功 checkpoint。恢复必须重建这些状态，不能只还原聊天。
+- 保存会话实际配置、原始工具消息及 call ID、草稿/文件 hash、冻结测试规格、验证报告、待审批列表、用量记录、工作区绑定与最近成功 checkpoint。恢复必须重建这些状态，不能只还原聊天。
 - 重启后 RUNNING 标为 INTERRUPTED。只读调用可安全重跑；验证先查询 Runner job_id，无法确认则记执行中断并重新跑；草稿写按幂等键查询；正式写入按提交日志与文件 hash 对账，禁止自动重放未确定结果的写/删。
-- 上下文达到 12k token 或 Provider 窗口 70%（取更小者）时，在完整工具调用/结果边界压缩。保留稳定规则、班情事实与未知项、未完成目标、预算、报告/版本指针和审批状态；工具原始证据留库，按需再读。未结束的 call/result 对不能截断或伪造。
+- 上下文达到 12k token 或 Provider 窗口 70%（取更小者）时，在完整工具调用/结果边界压缩。保留稳定规则、班情事实与未知项、未完成目标、调用记录、报告/版本指针和审批状态；工具原始证据留库，按需再读。未结束的 call/result 对不能截断或伪造。
 - 压缩摘要是辅助索引；事实、PASS、授权只能从结构化存储恢复。保持 system+tools 前缀和工具顺序稳定；换 Provider、schema 或 Policy 生成新配置版本，不能为缓存复用旧权限。
 
 ## 5. 结构化协议与教育依据链
@@ -164,7 +162,7 @@ Run 状态：`READY → RUNNING → WAITING_APPROVAL / COMPLETED / FAILED / STOP
 | `VerificationReport` | report/job/artifact ID、code_hash/test_spec_hash/runtime_digest/runner_policy_hash、逐 case actual/stdout/stderr/exit_code/duration/error、总状态、时间与证据引用 |
 | `Approval` | 教师 actor、具体操作和逐项决定、candidate/content_hash、base_revision 与目标文件旧 hash、测试规格/报告指纹、Policy 版本、diff、接受/拒绝/过期时间；模型无写权限 |
 | `WorkspaceRevision` | parent、文件增/改/删清单与前后 hash、快照、commit_id、对应 approvals、应用/回滚日志；用于幂等、冲突检测与恢复 |
-| `Session` / `Run` | workspace/mode/profile/stage/provider/model、消息/工具/事件、checkpoint、pending calls/approvals、状态、预算/用量、最后事件游标；会话与一次请求分开 |
+| `Session` / `Run` | workspace/mode/profile/stage/provider/model、消息/工具/事件、checkpoint、pending calls/approvals、状态、实际用量、最后事件游标；会话与一次请求分开 |
 
 ### 5.1 班情事实怎样影响产出
 
@@ -253,7 +251,7 @@ PC 服务只监听 loopback，启动时产生本机能力 token，校验 Host/Or
 | `POST /api/workspaces/sandbox` | 仅 seed_id；返回 workspace_id/revision/文件数，无任意根目录参数 |
 | `GET /api/workspaces/{id}/files`、`GET /api/workspaces/{id}/file?path=...` | 列表与允许的相对文件读取；与工具共用路径 Policy |
 | `POST /api/class-profiles/import` | 粘贴文本或上传 JSON/CSV，返回 facts/unknowns/errors/source_refs，支持更正生成新版本 |
-| `POST /api/sessions`、`GET /api/sessions/{id}` | 绑定工作区/学段/班情；读取含版本、待审核、报告、预算与事件游标的快照 |
+| `POST /api/sessions`、`GET /api/sessions/{id}` | 绑定工作区/学段/班情；读取含版本、待审核、报告、用量与事件游标的快照 |
 | `POST /api/sessions/{id}/messages`、`POST /api/sessions/{id}/resume` | 新请求/恢复，返回 run_id；已有活动 run 时拒绝重复启动 |
 | `POST /api/runs/{id}/cancel` | 停止后续模型/工具调用，终止运行作业；保存真实中断状态 |
 | `GET /api/sessions/{id}/events` | SSE，支持 Last-Event-ID/after 游标补发；前端断线不重新执行工具 |
@@ -311,7 +309,7 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 | 阶段/预算 | 最小任务与产物 | 阶段退出标准与拟执行命令 | 最危险依赖及回退路线 |
 |---|---|---|---|
 | 1：0–5h，骨架/部署预验证 | 本轮设计复核；Python/React 最小骨架、health；Provider/Runner/公网探针；PC 启动初版 | 前述 5h 闸口有实证；`python3.12 scripts/probe_provider.py`、`python3.12 scripts/probe_runner.py`、`npm --prefix frontend run build`，授权后健康检查 | Key、VPS、Docker/镜像；先换已证实支持工具的 Provider/合适 VPS，视频分支只作为明确缺口替代 |
-| 2：5–15h，Agent Core 与恢复 | schemas、串行 Loop、白名单工具、Policy、SQLite、SSE、预算；formal action 先审批暂停 | 模型真实读/写草稿并使用工具返回；越界拒绝；中断/重启还原工具/草稿/审批/用量；`python3.12 -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/integration/test_session_resume.py -q` | Provider 协议或恢复语义；关掉可选流式/并发，缩短上下文，保留单活动 run；不能以固定流水线替代 |
+| 2：5–15h，Agent Core 与恢复 | schemas、串行 Loop、白名单工具、Policy、SQLite、SSE、用量记录；formal action 先审批暂停 | 模型真实读/写草稿并使用工具返回；越界拒绝；中断/重启还原工具/草稿/审批/用量；`python3.12 -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/integration/test_session_resume.py -q` | Provider 协议或恢复语义；关掉可选流式/并发，缩短上下文，保留单活动 run；不能以固定流水线替代 |
 | 3：15–24h，真实验证 | 完整隔离 Runner、可信比对、hash 绑定、自动修复上限与清理；贯通单示例纵向切片 | 正确/错误/语法/异常/超时/资源/越界均有实际结果；修复同一受保护用例后通过；`python3.12 -m pytest backend/tests/unit/test_verification.py backend/tests/integration/test_runner.py -q` | 完整子进程清理/隔离缺陷；Web 失败关闭交付，PC 仅在明确授权下有限防护，均如实标记 |
 | 4：24–33h，教育核心 | LessonPlan/示例/三档习题、班情文本/JSON/CSV、两套种子、策略与错因、学段约束 | 一套完整产物所有代码真实通过；两班情/两学段实质差异、45 分钟/评分/依据链测试；`python3.12 -m pytest backend/tests/unit/test_education.py backend/tests/integration/test_lesson_generation.py -q`，另留真实模型生成证据 | 格式漂移/套话/超纲；缩小到《循环结构》和固定任务契约，不砍教育 B P0 |
 | 5：33–43h，PC/Web 审批导出 | 正式提交与恢复、diff、逐项审批、导出、真实本地目录、公网完整链路 | C/D 闭环分别可重放；拒绝字节不变、外部编辑冲突与提交中断恢复；`python3.12 -m pytest backend/tests/integration/test_publish.py backend/tests/integration/test_workspace.py -q`、`npm --prefix frontend run build`；获浏览器验证授权后 `cd frontend && npx playwright test e2e/lesson-flow.spec.ts e2e/approval.spec.ts` | 多文件一致性/公网运行；先阻断冲突与不完整导出，采用可靠的小型教案包，不以隐藏失败缩减必需产物 |
@@ -323,7 +321,7 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 
 | 优先级 | 阻塞/当前证据 | 最晚发现点 | 处理与不可突破的底线 |
 |---|---|---|---|
-| R1 | 百炼平台与 endpoint 已确定；凭据本地配置、账户模型权限、余额和真实工具调用尚未验证 | 0–2h | 完成百炼原生 tool_calls 往返探针与预算；替换模型也做同一探针。失败明确 A4 缺口，不能用 Mock 宣称真实 Agent |
+| R1 | 百炼平台与 endpoint 已确定；凭据本地配置、账户模型权限、余额和真实工具调用尚未验证 | 0–2h | 完成百炼原生 tool_calls 往返探针与实际用量记录；替换模型也做同一探针。失败明确 A4 缺口，不能用 Mock 宣称真实 Agent |
 | R2 | 目标 VPS 已 SSH 验证；远端 Docker 未就绪，Docker Hub registry 连接探测超时，80 端口已有服务 | 0–5h | 后续准备 Docker/Compose 与可验证的镜像获取路径，保留既有服务，再做最小部署与 Runner 探针；未完成仍不得标 D1/隔离通过 |
 | R3 | 代码执行失控、超时残留、测试被候选伪造 | 0–5h 首探针、24h 前完整 | 可信外部比对、容器资源/网络/路径与进程树测试；隔离失败关闭 Web 执行，禁止裸 subprocess 假装 Web 沙箱 |
 | R4 | 代码/测试/审批版本脱节，拒绝仍写入或重启重放 | 15h checkpoint、43h 提交闸口 | 不可变 revision/hash、幂等提交日志、锁与冲突检测；失配一律过期/停止，绝不静默覆盖 |
@@ -336,5 +334,5 @@ Web 种子工作区拟含 10 个文件：`lesson.json`、`lesson.md`、`examples
 待用户把关的三个决定（本轮已按推荐方案完成设计，不阻塞文档交付）：
 
 1. **运行与部署资源（VPS 已提供）**：使用已只读检查的目标 VPS，按现有方案准备容器运行环境并保留既有服务；现场 PC 仍按当前 macOS arm64 方案。Docker、镜像来源和应用入口需在实施阶段验证，本轮未授权或执行安装、部署、服务调整。
-2. **模型与费用（平台/档位已确定）**：按用户决定使用百炼及上述 endpoint，默认采用旗舰档 `qwen3.8-max`，保留可配置模型 ID；本地安全配置 Key 后验证调用权限与工具协议，费用继续按不超过 ¥50 的项目预算约束。Key 不写文档或 Git；公网传输仅合成/汇总班情。
+2. **模型与费用（平台/档位已确定）**：按用户决定使用百炼及上述 endpoint，默认采用旗舰档 `qwen3.8-max`，保留可配置模型 ID；本地安全配置 Key 后验证调用权限与工具协议，费用只作实际用量记录，不设置应用预算上限。Key 不写文档或 Git；公网传输仅合成/汇总班情。
 3. **教学与发布责任**：是否认可“初二/45 分钟/循环结构”先打穿、大学配置保留，以及全部示例/参考解当前测试通过、教师审核测试规格与教学适配、最终 diff 确认后才能正式写入的闸口。测试通过不能自动批准超纲、评分与错因判断。

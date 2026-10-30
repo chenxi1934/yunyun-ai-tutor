@@ -58,7 +58,7 @@ def live_education(socket, token, output):
             assert len(data['reports']) >= 5
             assert all(u['provider_request_id'] for u in data['usage'] if u['status'] == 'USAGE_ESTIMATE')
             data['status'] = 'PASS'
-            data['cny_estimate'] = sum(u['cny'] for u in data['usage'])
+            data['cny_estimate'] = sum((u['cny'] or 0) for u in data['usage'])
             output.write_text(dumps(data), encoding='utf-8')
             return {k: data[k] for k in ('status', 'session_id', 'cny_estimate')}
         finally:

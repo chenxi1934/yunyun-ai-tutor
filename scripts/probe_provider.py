@@ -14,7 +14,7 @@ from app.storage import Store
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["pc", "web"], default="pc")
-    parser.add_argument("--resume", help="恢复本工具创建的既有探针会话；不清零预算")
+    parser.add_argument("--resume", help="恢复本工具创建的既有探针会话；保留用量记录")
     args = parser.parse_args()
     settings = Settings()
     if settings.llm_provider == "mock":
@@ -28,7 +28,7 @@ async def main():
         marker = "PROBE-" + uid()
         (workspace / "fixture.md").write_text("合成文件，随机标记：" + marker, encoding="utf-8")
         configured = settings.model_copy(update={"yunyun_mode": args.mode, "yunyun_workspace": workspace})
-        # 与应用共用预算账本。重复探针不能通过临时数据库清零项目累计费用。
+        # 与应用共用用量记录，保留历史请求证据。
         store = Store(settings.yunyun_data_dir / "state.sqlite3")
         existing_evidence = PROJECT_ROOT / ".runtime" / "probe-provider.json"
         if existing_evidence.exists():
@@ -92,7 +92,7 @@ async def main():
                    "provider": settings.llm_provider, "model": settings.llm_model,
                    "first_turn_ok": bool(first_ok), "second_turn_ok": second_ok,
                    "tool_names": [c["name"] for c in store.find("calls", session["id"])],
-                   "estimated_cny": sum(u["cny"] for u in store.find("usage", session["id"])),
+                   "estimated_cny": sum((u["cny"] or 0) for u in store.find("usage", session["id"])),
                    "errors": [r["error"] for r in store.find("runs", session["id"]) if r["error"]],
                    "recovered_errors": report["recovered_errors"],
                    "evidence": str(location)}

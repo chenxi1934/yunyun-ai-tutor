@@ -15,7 +15,7 @@ export interface Snapshot {
   session: Session; messages: { role: string; content: string | null }[]; runs: Run[]
   drafts: Draft[]; verification_reports: VerificationReport[]; approvals: Approval[]; event_cursor: number
   lessons: Lesson[]; commits: Commit[]; profiles: {profile: Lesson["profile"]}[]; workspace_name: string
-  usage: { cny: number; status: string }[]
+  usage: { cny: number | null; status: string }[]
 }
 export interface Runtime { mode: string; provider: string; model: string; mock: boolean; key_configured: boolean; runner: string; workspace_name?: string }
 

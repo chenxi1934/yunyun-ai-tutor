@@ -51,7 +51,11 @@ def main():
                 teacher = Path(tempfile.mkdtemp(prefix='yunyun-stage05-teacher-', dir='/tmp')).resolve()
                 shutil.copytree(PROJECT_ROOT / 'backend/seeds/core', teacher, dirs_exist_ok=True)
                 (teacher / 'formal.md').write_text('教师原有正式文件\n')
-                # 独立验收数据库避免重启探针影响已运行的PC会话；费用预留继承并合并，不能清零。
+                marker = secrets.token_hex(12) if os.environ.get('YUNYUN_FINAL_ACCEPTANCE') else ''
+                if marker:
+                    readme = teacher / 'README.md'
+                    readme.write_text(readme.read_text() + '\n现场核验标记：' + marker + '\n')
+                # 独立验收数据库避免重启探针影响PC会话；用量记录继承并合并。
                 ledger = Settings().yunyun_data_dir / 'state.sqlite3'
                 scratch = PROJECT_ROOT / '.runtime' / (prefix + '-state-' + secrets.token_hex(4))
                 original = Store(ledger)
@@ -65,8 +69,9 @@ def main():
                 local_token = secrets.token_urlsafe(32)
                 env.update(RUNNER_SOCKET=str(socket), RUNNER_TOKEN=token, YUNYUN_MODE='pc',
                     YUNYUN_WORKSPACE=str(teacher), YUNYUN_LOCAL_TOKEN=local_token,
-                    MAX_PROJECT_CNY='33', YUNYUN_SECURE_COOKIE='false',
+                    YUNYUN_SECURE_COOKIE='false',
                     YUNYUN_DATA_DIR=str(scratch), YUNYUN_EVIDENCE_PREFIX=prefix,
+                    YUNYUN_ACCEPT_MARKER=marker,
                     YUNYUN_PC_URL='http://127.0.0.1:18006', YUNYUN_PC_WORKSPACE=str(teacher), YUNYUN_WEB_URL=args.url)
                 (PROJECT_ROOT / f'.runtime/{prefix}-teacher-path.txt').write_text(str(teacher))
                 log = (PROJECT_ROOT / f'.runtime/{prefix}-pc.log').open('a')

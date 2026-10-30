@@ -351,7 +351,7 @@ export default function App() {
           {recovery.entries.map(e => <details open key={e.path}><summary>{e.path} · {({BEFORE:'原文件未变',AFTER:'已写入审批版本',UNCHANGED:'内容未变',CONFLICT:'外部变更，须人工核对'})[e.state]}</summary><pre className="diff">{e.rollback_diff || '无需回退内容'}</pre><small>当前Hash：{e.current_hash || '不存在'}<br/>原Hash：{e.before_hash || '不存在'}<br/>提交目标Hash：{e.after_hash || '删除'}{e.current_mode != null && <><br/>当前权限：{e.current_mode.toString(8)} · 原权限：{e.before_mode?.toString(8) || '不存在'}</>}</small>{e.error && <p className="alert">{e.error.message}</p>}</details>)}
           <div className="actions">{(['accept','reject','rollback'] as const).map(decision => <button key={decision} disabled={pending || !recovery[`can_${decision}`]} onClick={() => void action(`/sessions/${sid}/commits/${recovery.commit_id}/recovery`,{decision,snapshot_hash:recovery.snapshot_hash,expected_revision:snapshot.session.revision}).then(ok => {if(ok)setRecovery(undefined)})}>{({accept:'确认已完整写入',reject:'确认未写入并拒绝',rollback:'确认回退已写入文件并拒绝'})[decision]}</button>)}<button disabled={pending} onClick={() => void openRecovery(recovery.commit_id)}>重新对账</button></div>
         </section>}
-        {!!snapshot?.usage.length && <p className="muted">累计估算 / 预留 ¥{snapshot.usage.reduce((total, u) => total + u.cny, 0).toFixed(4)}{snapshot.usage.some(u => u.status === 'RESERVED_UNKNOWN') ? '（含用量未知请求）' : ''}</p>}
+        {!!snapshot?.usage.length && <p className="muted">已知费用估算 ¥{snapshot.usage.reduce((total, u) => total + (u.status === 'RESERVED_UNKNOWN' ? 0 : (u.cny ?? 0)), 0).toFixed(4)}{snapshot.usage.some(u => u.cny === null || ['USAGE_UNKNOWN', 'RESERVED_UNKNOWN'].includes(u.status)) ? '（部分请求用量或费用未知）' : ''}</p>}
       </>}
     </aside>}
   </div>

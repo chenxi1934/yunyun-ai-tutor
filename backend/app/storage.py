@@ -131,33 +131,24 @@ class Store:
                 if run["status"] in {"RUNNING", "READY"}:
                     run["status"] = "INTERRUPTED"
                     run["error"] = {"code": "PROCESS_INTERRUPTED",
-                                    "message": "服务中断，检查点和预算已保留，可继续。"}
+                                    "message": "服务中断，检查点和用量记录已保留，可继续。"}
                     self.put("runs", run)
                     self.event(run["session_id"], run["id"], "run.interrupted", run["error"])
 
-    def reserve(self, run: dict, input_tokens: int, output_tokens: int,
-                input_price: float, output_price: float, settings) -> dict:
-        amount = (input_tokens * input_price + output_tokens * output_price) / 1_000_000
-        all_usage = self.find("usage")
-        mine = [x for x in all_usage if x["run_id"] == run["id"]]
-        if (sum(x["input_tokens"] for x in mine) + input_tokens > settings.max_input_tokens
-                or sum(x["output_tokens"] for x in mine) + output_tokens >
-                settings.max_total_output_tokens
-                or sum(x["cny"] for x in mine) + amount > settings.max_run_cny
-                or sum(x["cny"] for x in all_usage if x["session_id"] == run["session_id"]) + amount > settings.max_session_cny
-                or sum(x["cny"] for x in all_usage) + amount > settings.max_project_cny):
-            raise AppError("BUDGET_EXCEEDED", "已达到 Token 或费用预算，本轮已停止。", 409)
+    def start_usage(self, run: dict, input_price: float | None, output_price: float | None) -> dict:
+        # 只记录本次请求，不预扣费用或Token；中断时如实保留未知用量。
         record = {"id": uid(), "session_id": run["session_id"], "run_id": run["id"],
-                  "input_tokens": input_tokens, "output_tokens": output_tokens, "cny": amount,
+                  "input_tokens": 0, "output_tokens": 0, "cny": None,
                   "input_price": input_price, "output_price": output_price,
-                  "status": "RESERVED_UNKNOWN", "model": run["model"], "created_at": now()}
+                  "status": "USAGE_UNKNOWN", "model": run["model"], "created_at": now()}
         self.put("usage", record)
         return record
 
     def settle(self, record: dict, reply):
+        known_price = record['input_price'] is not None and record['output_price'] is not None
         record.update(input_tokens=reply.input_tokens, output_tokens=reply.output_tokens,
                       cny=(reply.input_tokens * record["input_price"] +
-                           reply.output_tokens * record["output_price"]) / 1_000_000,
+                           reply.output_tokens * record["output_price"]) / 1_000_000 if known_price else None,
                       status="USAGE_ESTIMATE", actual_model=reply.model,
                       provider_request_id=reply.request_id)
         self.put("usage", record)

@@ -326,7 +326,7 @@ def test_single_saved_lesson_compacts_below_old_threshold(setup_agent):
     agent, store, session, _, view = prepare(setup_agent)
     sid, call_id, context_id = session['id'], uid(), uid()
     # 单份完整提案加模板结果：真实失败历史为22538字节，低于旧24000阈值。
-    store.message(sid, 'fixture', {'role': 'user', 'content': '生成后真实验证，不提高预算。'})
+    store.message(sid, 'fixture', {'role': 'user', 'content': '生成后按固定用例真实验证。'})
     store.message(sid, 'fixture', {'role': 'assistant', 'content': None, 'tool_calls': [{
         'id': context_id, 'type': 'function', 'function': {'name': 'get_education_context', 'arguments': '{}'}}]})
     context_result = {'ok': True, 'data': agent.education.context(sid)}
@@ -346,4 +346,43 @@ def test_single_saved_lesson_compacts_below_old_threshold(setup_agent):
     context = agent.context(session)
     assert len(dumps(context).encode()) < len(raw.encode())
     assert context[-3:] == [store.messages(sid)[0], *store.messages(sid)[-2:]]
+    assert dumps(store.messages(sid)) == raw
+
+
+def test_education_compaction_preserves_current_file_evidence_as_tool_data(setup_agent):
+    agent, store, session, root, view = prepare(setup_agent)
+    sid = session['id']
+    marker = uid()
+    (root / 'fixture.md').write_text('现场核验标记：' + marker)
+    user = {'role': 'user', 'content': '读取fixture.md后备课，并复述核验标记。'}
+    store.message(sid, 'fixture', user)
+    read_call = {'id': uid(), 'run_id': 'fixture', 'name': 'read_file',
+                 'arguments': dumps({'path': 'fixture.md'})}
+    result = agent.registry.execute(read_call, session, agent.workspace(session))
+    assert result['ok'] and marker in result['data']['content']
+    read_messages = [
+        {'role': 'assistant', 'content': None, 'tool_calls': [{
+            'id': read_call['id'], 'type': 'function', 'function': {
+                'name': 'read_file', 'arguments': read_call['arguments']}}]},
+        {'role': 'tool', 'tool_call_id': read_call['id'], 'content': dumps(result)},
+    ]
+    for message in read_messages:
+        store.message(sid, 'fixture', message)
+    store.put('calls', {**read_call, 'session_id': sid, 'status': 'DONE', 'result': result})
+    for name, args, data in [
+        ('get_education_context', {}, agent.education.context(sid)),
+        ('propose_lesson', {'plan': view['plan']}, {'lesson_id': view['lesson_id']}),
+    ]:
+        call_id = uid()
+        store.message(sid, 'fixture', {'role': 'assistant', 'content': None, 'tool_calls': [{
+            'id': call_id, 'type': 'function', 'function': {'name': name, 'arguments': dumps(args)}}]})
+        result = {'ok': True, 'data': data}
+        store.message(sid, 'fixture', {'role': 'tool', 'tool_call_id': call_id, 'content': dumps(result)})
+        store.put('calls', {'id': call_id, 'session_id': sid, 'name': name,
+                           'status': 'DONE', 'result': result})
+    raw = dumps(store.messages(sid))
+    assert len(raw.encode()) > 16000
+    compacted = agent.context(session)
+    assert all(message in compacted for message in read_messages)
+    assert not any(marker in (m.get('content') or '') for m in compacted if m['role'] == 'system')
     assert dumps(store.messages(sid)) == raw

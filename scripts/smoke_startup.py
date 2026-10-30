@@ -45,7 +45,7 @@ def stop(process):
 
 class ApprovalProbeProvider:
     """显著测试Mock：控制审批检查点；文件/数据库操作仍真实执行。"""
-    async def complete(self, messages, tools, max_tokens):
+    async def complete(self, messages, tools):
         result = None
         if messages[-1]["role"] == "tool":
             result = json.loads(messages[-1]["content"])

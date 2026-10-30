@@ -24,9 +24,9 @@ class TLSForwardProvider(BailianProvider):
         super().__init__(settings)
         self.socket = socket
 
-    async def complete(self, messages, tools, max_tokens):
+    async def complete(self, messages, tools):
         provider = BailianProvider(self.settings, transport=httpx.AsyncHTTPTransport(uds=self.socket))
-        return await provider.complete(messages, tools, max_tokens)
+        return await provider.complete(messages, tools)
 
 
 def check_lesson(agent, session, data):
@@ -169,7 +169,7 @@ def live_acceptance(socket, token, output):
                 k: d.get('check_error') for k, d in bundle['scenarios'].items() if d['status'] != 'PASS'}
             bundle['comparison'] = comparison(bundle['scenarios'])
             bundle['status'] = 'PASS'
-            bundle['cny_estimate'] = sum(u['cny'] for d in bundle['scenarios'].values() for u in d['usage'])
+            bundle['cny_estimate'] = sum((u['cny'] or 0) for d in bundle['scenarios'].values() for u in d['usage'])
             output.write_text(dumps(bundle), encoding='utf-8')
             output.with_name(output.stem + '-comparison.json').write_text(
                 json.dumps(bundle['comparison'], ensure_ascii=False, indent=2), encoding='utf-8')

@@ -9,16 +9,14 @@ from app.domain import AppError, ModelReply, ToolCall, uid
 
 
 class Provider(Protocol):
-    async def complete(self, messages: list[dict], tools: list[dict],
-                       max_tokens: int) -> ModelReply: ...
+    async def complete(self, messages: list[dict], tools: list[dict]) -> ModelReply: ...
 
 
 class BailianProvider:
     def __init__(self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None):
         self.settings, self.transport = settings, transport
 
-    async def complete(self, messages: list[dict], tools: list[dict],
-                       max_tokens: int) -> ModelReply:
+    async def complete(self, messages: list[dict], tools: list[dict]) -> ModelReply:
         key = self.settings.dashscope_api_key.get_secret_value()
         if not key:
             raise AppError("API_KEY_MISSING", "未配置百炼密钥，请在本地 .env 配置后重启服务。", 503)
@@ -30,10 +28,10 @@ class BailianProvider:
                     headers={"Authorization": "Bearer " + key},
                     json={"model": self.settings.llm_model, "messages": messages,
                           "tools": tools, "tool_choice": "auto", "stream": False,
-                          "enable_thinking": False, "max_tokens": max_tokens},
+                          "enable_thinking": False},
                 )
         except httpx.TimeoutException:
-            raise AppError("PROVIDER_TIMEOUT", "模型请求超时，可能已计费；预算预留已保留。",
+            raise AppError("PROVIDER_TIMEOUT", "模型请求超时，实际用量未知，请稍后重试。",
                            503, True) from None
         except httpx.RequestError:
             raise AppError("PROVIDER_UNAVAILABLE", "无法连接模型服务，请检查网络和服务地址。",
@@ -83,8 +81,7 @@ class BailianProvider:
 class MockProvider:
     """仅用于离线演示，固定选择读工具；不满足真实 API 验收。"""
 
-    async def complete(self, messages: list[dict], tools: list[dict],
-                       max_tokens: int) -> ModelReply:
+    async def complete(self, messages: list[dict], tools: list[dict]) -> ModelReply:
         start = max(i for i, msg in enumerate(messages) if msg["role"] == "user")
         results = [json.loads(msg["content"]) for msg in messages[start:]
                    if msg["role"] == "tool"]

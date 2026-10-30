@@ -5,11 +5,11 @@
 | 阶段 | 状态 | 验收证据 | 阻塞/风险 |
 |---|---|---|---|
 | 1. 设计/骨架/预部署 | PARTIAL：设计/骨架/远端临时容器验证完成 | 阶段02命令与下方证据；远端 Python 3.12 / Node 22 镜像构建及进程恢复通过 | 原阶段缺口已在05补齐：公网HTTPS与持续Runner |
-| 2. Agent Core | 已实现；专项修复归档阈值与验证工具指令冲突 | 阶段04历史151项；阶段05当前172项回归；真实模型整课为上轮证据 | 正式交付/浏览器已在05完成；人工教育审查待完成 |
+| 2. Agent Core | 已实现；专项修复归档阈值与验证工具指令冲突 | 当前干净环境全量218项；真实模型/工具/恢复见末节 | 正式交付/浏览器已验；人工教育审查待完成 |
 | 3. 正确性验证 | 已实现；真实隔离、错误/修复/过期阻断 | 阶段03第11节125项历史验收；阶段04另有真实回归 | 阶段05已部署持续Manager；保持候选按次创建/清理 |
-| 4. 教育能力 | 两班情与大学真实生成、逐项文案修订及复验PASS | 151后端+8真实教育集成；最终15程序/51用例PASS；专项验收末节有差异与完整证据 | 真实教师审核仍PENDING；教育UI/正式发布已在05验收 |
-| 5. PC/Web | 已实现；五项评审修复专项回归PASS | 当前172后端+6真实容器+22浏览器控制流；双端主线三场景/51用例为上轮证据 | 本轮修复未部署，公网新版本NOT_TESTED；人工教学审查/原生弹窗待验收；见末节 |
-| 6. 回归与交付 | NOT_STARTED | 最终面试全矩阵、视频与现场验收尚未开展；功能回归和Web链接见05 | 依赖前五阶段与人工教育审核 |
+| 4. 教育能力 | 两班情与大学真实生成、逐项文案修订及复验PASS | 阶段04历史151+8；当前全量218含真实教育集成，新PC/本地Web/公网B及大学包见末节 | 真实教师专业审核仍NOT_TESTED；用例不证明自由讲解正确 |
+| 5. PC/Web | 已实现；干净依赖/CLI/前后端和公网冷启动验收PASS | 当前218后端（42真实容器）+22界面HTTP夹具；4个新包各5程序，17/18/18/16用例 | 整课/故障阻断/三次重启/真实文件回退已验；人工教学审查、原生弹窗/现场换机待验 |
+| 6. 回归与交付 | PARTIAL：技术验收/材料/授权部署完成，完整交付FAIL | 干净环境218后端、前端构建、真实双端/公网、审批/重启/ZIP/单页PDF；见末节 | 专业教师审核、真正现场机、成片/链接及最终Git同步未完成；旧.env权限0644需人工收紧；模型误读/网络失败保留 |
 
 ## 2026-10-29：执行 prompts/01-plan.md，仅架构与验收设计
 
@@ -495,3 +495,92 @@ Firefox在本机macOS图形子进程启动失败（sandbox extension / framebuff
 证据：[后端JUnit](../.runtime/stage05-review-backend.xml)、[真实容器JUnit](../.runtime/stage05-review-real-delivery.xml)、[浏览器控制流](../.runtime/stage05-review-browser.json)、[对账截图](../.runtime/stage05-review-chrome-recovery.png)。首轮55项、132项等针对性检查均属于上述集合，不叠加计数。
 
 **NOT_TESTED**：本轮修复的公网部署与公网完整备课重跑、真实模型整课重跑、真实教师教育审核、原生目录选择器人工操作。上轮URL/整课证据仅是历史记录。未知外部内容/权限冲突需教师人工核对，不自动覆盖；修复前已丢失的原权限无法追溯恢复。
+
+
+## 2026-10-30：评审修复部署，准备继续验收
+
+用户明确授权“我去提交，你去部署”。代码提交由用户完成，本轮没有Git提交/推送；部署时提交为`9d0457ec0ddbfe36cd417f134ad57a33cbb16412`，业务源码快照SHA256为`a64e8d7be8cb028ad1fa61dc99b9efc3b9978c266f868664b768ae342a891798`。构建、切换后再次核对当前工作区82个源文件均未漂移；本节新增的部署文档记录不影响运行代码快照。
+
+- 发布版本`review-20261029185906-a64e8d7be8`，新API/React已在 https://111.229.226.186 提供服务。实际HTTP/TLS/Chrome验证，没有因构建命令成功就标公网PASS。
+- 现有一键部署脚本用于首次完整安装，会重写配置并重建Runner；本轮采用`.runtime/deploy-stage05-review.py`执行API增量更新，保留现有环境/Key/预算、Runner容器、Nginx和证书。新镜像先在隔离DB探针通过，再确认无执行中的任务、停止旧API并备份，然后切换到同一持久目录。
+- 切换前后5会话/5任务/4提交/21条usage记录完全一致，原有91个工作区文件Hash一致；累计估算/保守预留¥1.830912未重置。公网合成冒烟额外创建两个独立工作区，不碰原会话；整个部署/冒烟没有调用付费模型，usage数量/金额保持不变。
+- 回退保留停止状态的旧API容器`yunyun-api-rollback-review-20261029185906-a64e8d7be8`及远端版本目录中的SQLite/完整数据归档；旧容器禁止自动重启。探针容器与临时探针DB已清理。API仍仅绑定127.0.0.1:18005，API无Docker Socket，Manager不公开端口且容器身份未改变。
+
+| 实际命令/验证 | 结果 |
+|---|---|
+| `.venv/bin/python .runtime/deploy-stage05-review.py` | PASS；独立Docker构建/候选探针/备份/切换，生产配置Hash与旧工作区保持一致 |
+| 实际导入包路径Hash与部署源清单比较；HTTPS取静态资源并与运行镜像比较 | PASS；25个Python模块一致，index.html/JS/CSS三份文件一致 |
+| `YUNYUN_PLAYWRIGHT_MODULE=<现有模块> node .runtime/stage05-deploy-smoke.cjs` | PASS；真实公网React/API/文件，无HTTP夹具；540065字节原文、界面上传含BOM的1MiB并核对Hash、超限413、Python删除拒绝/接受、0600新建/覆盖/回退、正常提交恢复入口409、跨cookie404/越界403/Web本地入口403/SSE回放、实际预览文件且无JS异常 |
+| 最终Docker状态/费用只读检查 | PASS；API healthy、Runner ISOLATED，无遗留执行容器；预算配置和21条usage未变 |
+
+第一轮公网探针误把每次变化的`request_id`纳入“文件不变”全响应比较，出现探针误报；已保留attempt1，修正为核对path/content/hash/mode后完整重跑通过，没有修改业务代码或弱化文件断言。
+
+证据：[部署](../.runtime/stage05-deploy-review.json)、[构建日志](../.runtime/stage05-deploy-review-build.log)、[源清单](../.runtime/stage05-deploy-review-source.json)、[运行模块与公网资源Hash](../.runtime/stage05-deploy-review-hashes.json)、[公网冒烟](../.runtime/stage05-deploy-review-public.json)、[公网截图](../.runtime/stage05-deploy-review-public.png)。
+
+**准备状态：可刷新公网页面并新建会话继续验收。** 本轮为部署及合成数据冒烟，未重跑付费模型完整备课/整课验证导出，也未在公网注入中断故障，不把上一轮完整备课结果算成本版本的新PASS。PC原有进程未重启，下一轮从一键入口为新工作区启动当前代码；原生目录弹窗/真实教师教育审核仍NOT_TESTED。
+
+## 2026-10-30：阶段06最终验收与面试交付
+
+完整读取指定原题、规则、计划、历史证据和06 Prompt；起始仅README/PROGRESS/ACCEPTANCE三份文档未提交，保留后继续。未Git提交/推送，未修改本地.env/密钥、锁文件或无关功能。最终逐项判定见[ACCEPTANCE第18节](ACCEPTANCE.md#18-阶段06最终验收2026-10-30)，完整交付不是全部PASS。
+
+本轮唯一业务修复在`backend/app/agent.py`：真实PC读取随机标记后，教育归档丢弃读取正文导致模型错说文件无标记。新增单测先真实FAIL，随后以8 KiB上限保留同轮完整只读交换，仍为不可信tool数据；没有放宽预算或修改原始历史。新增`scripts/verify_stage06.py`用importlib及显式路径消除两份同名教育测试的全量收集冲突；增强既有Playwright留存真实模型/usage/文件标记与教学文字变化，支持独立场景重跑。`scripts/recheck_stage06.py`仅通过既有HTTP接口重放并修订本轮已知文字错误，不是新业务能力。
+
+| 实际执行 | 结果与证据 |
+|---|---|
+| `.venv/bin/python scripts/verify_stage06.py root@111.229.226.186 --evidence-prefix stage06-final` | **215 PASS，0失败/错误/跳过，257.42秒**；173控制流+42真实容器（29 Runner/8教育/5正式交付）。临时Manager孤儿回收PASS、最终候选为空。初轮214、172与49子集不重复计数 |
+| `npm --prefix frontend run build`；`ruff check backend runner scripts`；`node --check scripts/browser-stage05.cjs`；`git diff --check` | PASS；TypeScript/Vite、JS `index-4etU0DhF.js`，前端没有功能/样式变更。1条既有Starlette弃用警告 |
+| `verify_stage05.py ... --browser --evidence-prefix stage06-final`，真实Chrome/WebKit | 三场景技术PASS，15程序51初始用例；PC随机标记正确复述、三次实际SIGKILL恢复、拒绝不写、接受落盘/mtime不重写；公网真实错误输出→409阻断→同规格修复、上传/ZIP/隔离。该批内容采用建议稿，不冒充自由改写 |
+| 增强文字改写请求，部署后公网B与大学独立验收 | 两场景真实qwen3.8-max各改写2活动/2讲解，分别18/16用例；B所在整批后续PC预算停止，整体FAIL保留；大学独立WebKit PASS |
+| `scripts/recheck_stage06.py --source .runtime/stage06-release-browser.json --prefix stage06-content` | PASS；发现B稿把range(1,6)偶数和6写成10。以新cookie重放原AI稿，拒绝后修正文案，代码/本会话规格不变；5程序18用例重新真实通过与合成审批导出；model_called=false，不是教师专业批准 |
+| 启动/控制流 | 当前Mac shell入口pc/bailian/mock=false/ISOLATED/HTML200；`smoke_startup.py`显式Mock验证PC/Web真实进程、恢复、SSE与缺Key拒绝。Chrome/WebKit界面夹具22项PASS，另存stage06-ui-control.json，不冒充真实模型/Runner |
+| 交付材料 | README/环境示例/部署与限制、AI_DEV_LOG真实案例、DESIGN_DECISIONS.md及实际1页PDF、4分50秒演示脚本完成。没有成片与上传链接；Git远端可访问性因非交互鉴权失败未验 |
+
+用户单独确认“部署已验证的修复版”后，采用增量API/React发布：版本`final-20261029233419-aec15c4429`，源码包Hash`aec15c442952f023c9c3f49015bc4d5e1f834a4e6321ef8e8e88a04623f61078`，HEAD仍`9d0457e`加未提交改动。线上25个安装包模块及3个公网静态资源Hash核验PASS；Agent Hash`ea0106168edc655bf3d567d4d85f4ae226586879704c5715cb0a323a89a8055f`。保留10会话/8任务/11提交/40条usage及¥3.143136估算预留、原工作区、配置/预算、Runner、Nginx/证书；备份和旧API回退容器已准备，未做实际切回。首次部署因SSH控制连接过期在修改服务器前失败，重新认证后成功；密码未落到脚本/文档。
+
+模型费用沿用原账簿：本轮估算/保守预留增加约¥4.216380，最终本机¥20.163660+Web¥4.128432=¥24.292092（含历史与未知用量，不是精确账单）。Web维持¥12、本机验收¥33上限。扩展PC请求`362e53f0fa954753a9679304bd5a5e58`含一次未知预留，第6步STOPPED/BUDGET_EXCEEDED；**独立FAIL，未调高限额、清零预算或切Mock**。
+
+推荐演示产物：PC A、修正后的Web B、新WebKit大学三个ZIP各15文件/5程序/5独立报告，17/18/16用例；manifest、代码、规格、逐case和验证指纹逐项核对。旧错误稿只作证据，不作为推荐课堂材料。所有合成审核均不能代替真实教师。
+
+证据：[215项JUnit](../.runtime/stage06-final-real-tests.xml)、[隔离/源码/清理](../.runtime/stage06-final-summary.json)、[双端主线](../.runtime/stage06-final-browser.json)、[改写B及PC长请求FAIL](../.runtime/stage06-release-browser.json)、[新大学](../.runtime/stage06-release-university-browser.json)、[文字纠错](../.runtime/stage06-content.json)、[推荐包核对](../.runtime/stage06-packages.json)、[部署](../.runtime/stage06-deploy.json)、[线上Hash与TLS](../.runtime/stage06-deploy-hashes.json)。本机运行证据被Git忽略，不随源码自动提交。
+
+**未验证/未满足**：用户明确现场换机器，C1/E4现场机NOT_TESTED；B4/B5专业教师教学/适配审核及依赖它们的C4/D4未验；原生目录弹窗、Firefox/第三条网络、真实证书续期、部署回退演练未做；视频成片/链接与最终Git同步缺失，E5为FAIL。只验证当前Mac；当前工作区改动等待用户自行处理Git。最终API healthy、私有Manager运行，无候选容器遗留，本轮临时测试进程已结束。
+
+
+## 2026-10-30：按用户要求完全删除模型调用预算并复验
+
+用户确认原预算需求错误，删除费用、累计Token、模型/工具次数、累计时长和单次输出Token预算，以及请求前预扣/预留；不是提高阈值或临时开关。同步清除配置字段、停止分支、Provider输出上限参数、响应中隐藏的24条工具限制、部署参数与运行环境旧键，更新当前PLAN/Prompt/README；旧失败与usage作为历史保留。实际usage/已知费用只作记录，未知为null，不阻断调用，旧配置可恢复。沙箱、单次超时/网络重试、无进展、两次修复和教师审核/Hash边界保留。
+
+- `.venv/bin/python scripts/verify_stage06.py root@111.229.226.186 --evidence-prefix stage06-unlimited`：**218 passed，0失败/错误/跳过，263.25秒**，176控制流+42真实容器；初轮175只是子集。新增/改写回归覆盖14推理、25工具、大用量、未知价格/用量、跨会话旧记录不阻断与旧配置恢复；没有改代码用例的expected或隔离断言。首轮39通过/1失败揭示隐藏的ModelReply限制，已修复，失败记录保留。
+- `npm --prefix frontend run build`、ruff、JS语法、diff检查PASS；费用显示按ui-ux Tiny和web-design-guidelines检查，null不显示为虚构扣费，旧预留不计已知费用。Chrome/WebKit界面控制流22项及当前启动/恢复/SSE冒烟PASS，Mock/夹具与真实API证据分开。
+- **原受限PC长请求PASS**：新目录和真实qwen3.8-max，会话714c9ee48e5c4584b8cd85820922431d，发起8请求、7成功usage/1未知；2活动/2讲解实质改写、随机文件标记复述、5程序17用例、三次进程重启、拒绝/接受、实际落盘和ZIP通过。未知用量不再触发预扣/停止。
+- **新版公网Web PASS**：新会话7c304f74d7f94b6492b280393384998d，7真实请求；2活动/2讲解改写、5程序18初始用例、故意错误输出与409交付阻断、同规格修复、审核/拒绝/接受/导出及cookie隔离完成。
+- 新PC/Web两个ZIP各15文件/5代码/5独立报告，manifest/代码/规格/指纹全部匹配。真实教师专业审核仍未完成；模型预算移除不等于教案已获专业批准。
+
+已增量上线unlimited-20261030000307-22b1c699a2，源包Hash 22b1c699a28ad882aa5317c3a2765f05fd52b8b64e4a8849137554c28925e498；删除线上MAX_PROJECT_CNY/MAX_SESSION_CNY，保留其他配置、数据、原Runner及证书。当前安装25模块及公网静态Hash核对PASS，Settings与容器环境均无预算字段。调用记录不作为准入条件；PC已知费用估算¥0.695160另1次未知、Web估算¥0.728556，不当作精确账单。
+
+完整证据与命令见[ACCEPTANCE第19节](ACCEPTANCE.md#19-删除模型调用预算并重新验收2026-10-30)及`.runtime/stage06-unlimited-*`。原第18节预算停止现为历史，已完成对应复验；现场换机、专业教师审核、成片/视频链接和最终Git同步仍待用户完成。未提交或推送Git，未修改密钥/锁文件/CI或执行隔离策略。
+
+## 2026-10-30：最终交付检查，从干净启动环境验证README
+
+本轮没有功能或业务代码变更。以当前Git候选101文件创建新源码副本，重新建立Python 3.12.14 venv、npm依赖、前端构建、数据目录和SSH认证；实际导入路径在新副本/新venv中。全量测试使用新临时Manager，主线不依赖旧本地进程；完成后再顺序冷重启现有公网API/Manager。Docker/Nginx是已有基础设施，没有声称验证空白VPS安装。
+
+- **PASS**：README官方PyPI安装、npm安装39包、`pip check`；tsc/Vite 1581模块；ruff。新venv实际运行`scripts/verify_stage06.py root@111.229.226.186`，**218 passed / 0 failed / 0 errors / 0 skipped，256.54秒**，176受控控制流/Provider+42真实容器；源码/14份测试Hash与当前工作区一致，孤儿回收通过。
+- **PASS，证据范围有限**：`smoke_startup.py`的PC/Web真进程、文件、恢复/SSE和缺Key拒绝，LLM显式Mock；新Playwright安装后的Chrome/WebKit 22项React控制流使用HTTP夹具，不当作真实LLM/Runner。
+- **PASS，真实PC**：新目录`/private/tmp/yunyun-final-teacher-5vr6egq9`、会话`332f9c0e198b424eb71c7dab9191a6da`，README普通请求5次真实qwen3.8-max、5程序17用例。实际通过`start-desktop.sh`入口启动，三次SIGKILL后重新打开新口令入口，PID 19469/19948/19965/19974；待审批/已提交/覆盖与mtime恢复。教学拒绝/接受、死循环TIMEOUT与两种409阻断、同规格修复、Diff拒绝/写入、已有文件覆盖和真实历史回退均通过。另独立执行README `--runner-ssh`，新PC启动、真实目录读取与ISOLATED通过，该专项未调模型。
+- **PASS，真实Web**：新本地B会话`437d08c2fd2d495faaef1623a42e9238`完整18用例；公网冷启动后新Chrome B `2d9dcfe178ff47b6b1a15513894c260c`为18用例、新WebKit大学`6fa5957700084fceb2ac0438ceb17314`为16用例；CSV、错误代码阻断、审核拒绝/接受、刷新、cookie隔离、ZIP及无JS错误均通过。所有审核是合成动作，不能替代专业教师。
+- **PASS，产物**：4包各15文件/5程序/5真实报告，逐个CRC、JSON/Markdown、评分、receipt/manifest、code/spec/fingerprint与逐case输出核对；PC14个正式文件Hash与ZIP一致、模式0600。7个合成种子、两学段结构、一页PDF（实际1页）与4分50秒脚本齐全；种子代码本身仍NOT_TESTED。
+- **PASS，公网冷启动**：确认空闲后停API、备份SQLite为0600，重启Manager及API；PID从874471/453315变973135/973079，数据计数和配置内容不变，25源码模块/3新构建静态文件Hash一致。HTTPS有效至2026-11-05 14:07:48北京时间。本轮没有重新发布或替换镜像/配置。
+- **PASS，Git敏感扫描**：101候选文件、暂存区、209个本地可达历史blob及前端产物没有实际模型Key/高置信私钥模式；.env/runtime/依赖被忽略，运行证据复制前另检查真实Key并排除鉴权状态。远端完整历史未扫描。
+- **FAIL，原配置权限**：原工作目录.env是0644，遵守不擅改原配置的规则未更改；须人工`chmod 600 .env`。本轮新配置0600，临时配置/鉴权状态在结束时清理。
+
+失败如实保留：原默认pip因本机清华源不能获取setuptools而FAIL，README现指定命令级官方源；macOS cp-n保留已有文件时返回1，改为显式条件复制并复验不覆盖。首批PC模型把“现场核验标记”误当暂停条件，只有文字没有教案，FAIL；其后一次PROVIDER_UNAVAILABLE、一次最终回复PROVIDER_TIMEOUT（已有5份真实PASS报告），均FAIL。后两轮验收驱动因PC危险请求漏口令先获403、TIME_WAIT端口预检/清理误报而FAIL；修正的是忽略目录内探针，没有削弱应用权限或用例，第六轮PC完整通过。首批Web子场景独立PASS，未把首批整体失败改成成功。
+
+只修改README安装/SSH鉴权/保留配置步骤与过期作战包入口，以及PROGRESS、ACCEPTANCE、AI_DEV_LOG。没有改原.env、业务代码、锁文件或CI，没有提交/推送。所有新包各场景的最终通过和早期失败分开保存；普通请求本轮未要求额外自由改写，第19节自由改写证据不混入本轮新结果。
+
+**NOT_TESTED / 未完成**：真实教师专业审核、真正现场换机、原生目录/Windows/Firefox/第三网络、空白VPS首次部署、未来真实证书续期及切回演练；无视频文件/上传链接，最终Git未同步且非交互远端访问需鉴权，E5完整交付仍FAIL。新建本地服务/临时Manager/候选已结束，公网保持运行。
+
+逐条表、运行命令与链接见[ACCEPTANCE第20节](ACCEPTANCE.md#20-干净环境最终交付检查2026-10-30)；146份脱敏运行证据已保留在忽略目录`.runtime/final-clean-*`/`final-public-*`，完整JUnit、独立包核对与源码证据不依赖临时服务。
+
+## 2026-10-30：用户授权本地提交
+
+用户明确要求“git提交掉”，将阶段06修复、全部模型预算移除、回归与最终交付材料合为本地提交；未执行push。提交前核对代码/测试Hash与已通过的218项后端验收版本一致，单页PDF也未变；本轮没有重跑完整测试或更改业务代码。暂存区敏感信息及空白错误检查通过，.env、运行证据/数据库、依赖和构建产物保持忽略。README与ACCEPTANCE同步本地提交/远端未同步的区别；历史失败、教师审核/现场/视频等未完成状态保留，详见ACCEPTANCE第21节。

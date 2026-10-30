@@ -44,7 +44,7 @@ async def test_slow_read_uses_declared_timeout_and_keeps_heartbeat_responsive(se
     assert len(provider.requests) == 1
 
 
-async def test_run_remaining_time_bounds_file_preparation(setup_agent, monkeypatch):
+async def test_file_preparation_keeps_its_own_timeout(setup_agent, monkeypatch):
     real_read = Workspace.read
     release, finished = threading.Event(), threading.Event()
 
@@ -57,14 +57,16 @@ async def test_run_remaining_time_bounds_file_preparation(setup_agent, monkeypat
 
     monkeypatch.setattr(Workspace, "read", slow_read)
     agent, store, session, root = setup_agent(ScriptedProvider(reply(("propose_patch", {
-        "path": "late.md", "content": "late draft", "base_hash": None}))), max_active_seconds=.08)
+        "path": "late.md", "content": "late draft", "base_hash": None}))))
+    monkeypatch.setattr(tools, 'SPECS', tuple(replace(spec, timeout_seconds=.08)
+                        if spec.name == 'propose_patch' else spec for spec in tools.SPECS))
     run = agent.new_run(session["id"], "提出草稿", 0, "request-0001")
     started = time.monotonic()
     try:
         await agent.run(run["id"])
         assert time.monotonic() - started < .5
         state = store.get("runs", run["id"])
-        assert state["status"] == "STOPPED" and state["error"]["code"] == "TIME_BUDGET"
+        assert state["status"] == "FAILED" and state["error"]["code"] == "TOOL_TIMEOUT"
     finally:
         release.set()
         assert await asyncio.to_thread(finished.wait, 1)

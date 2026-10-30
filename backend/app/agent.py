@@ -76,14 +76,11 @@ class Agent:
         return Workspace(value["root"], tuple(value["identity"]))
 
     def _config(self) -> dict:
-        keys = ("max_steps", "max_tools", "max_active_seconds", "model_timeout_seconds",
-                "max_output_tokens", "max_input_tokens", "max_total_output_tokens",
-                "max_run_cny", "max_project_cny", "max_session_cny")
         return {"provider": self.settings.llm_provider, "model": self.settings.llm_model,
                 "endpoint_hash": sha(self.settings.dashscope_base_url),
                 "price_override": [self.settings.llm_input_cny_per_million,
                                    self.settings.llm_output_cny_per_million],
-                "limits": {k: getattr(self.settings, k) for k in keys},
+                "limits": {"model_timeout_seconds": self.settings.model_timeout_seconds},
                 "schema_policy_hash": sha(SYSTEM + dumps(schemas()) + "policy-v1")}
 
     def new_run(self, sid: str, text: str, revision: int, key: str) -> dict:
@@ -126,8 +123,11 @@ class Agent:
             if not runs or runs[-1]["status"] not in {"INTERRUPTED", "FAILED"}:
                 raise AppError("NOT_RESUMABLE", "当前任务不需要恢复。", 409)
             run = runs[-1]
-            if run["config"] != self._config():
-                raise AppError("CONFIG_CHANGED", "恢复需使用原模型、工具策略和预算配置。", 409)
+            current_config = self._config()
+            saved_config = {**run["config"], 'limits': {
+                k: run['config']['limits'].get(k) for k in current_config['limits']}}
+            if saved_config != current_config:
+                raise AppError("CONFIG_CHANGED", "恢复需使用原模型、工具策略和请求超时配置。", 409)
             run["status"], run["error"] = "READY", None
             session["revision"] += 1
             self.store.put("sessions", session)
@@ -187,8 +187,7 @@ class Agent:
             prefix.append({"role": "system", "content": "当前草稿与冻结测试索引（正文用read_draft读取）：" +
                            dumps({"drafts": drafts_index, "test_specs": specs_index})})
         if lessons and len(dumps(messages).encode()) > 16000:
-            # 单份JSON与context模板也可能耗尽重试预算。归档已完成的旧交换，
-            # 保留当前需求和最后提案的完整协议，避免模型重复生成；原文/预算不动。
+            # 归档已完成的旧交换，保留当前需求和最后提案完整协议；原始历史不动。
             calls = self.store.find('calls', session['id'])
             saved = {c['id'] for c in calls if c['name'] == 'propose_lesson'
                      and c['status'] == 'DONE' and c.get('result', {}).get('ok')}
@@ -199,14 +198,30 @@ class Agent:
                 index = proposals[-1]
                 archived = messages[:index]
                 archived_ids = {c['id'] for m in archived for c in m.get('tool_calls', [])}
+                # 教育JSON归档不能丢掉同轮刚读到的文件事实。保留有界、完整的原生
+                # 只读交换，仍作为不可信tool数据，不能把文件正文提升成system指令。
+                reads, read_bytes = [], 0
+                for i in range(user_index + 1, index):
+                    batch_calls = messages[i].get('tool_calls', [])
+                    if not batch_calls or not all(c['function']['name'] in
+                            {'list_files', 'read_file', 'read_draft'} for c in batch_calls):
+                        continue
+                    batch = messages[i:i + len(batch_calls) + 1]
+                    if [m.get('tool_call_id') for m in batch[1:]] != [c['id'] for c in batch_calls]:
+                        continue
+                    size = len(dumps(batch).encode())
+                    if read_bytes + size <= 8192:
+                        reads.extend(batch)
+                        read_bytes += size
                 prefix.append({'role': 'system', 'content': '已完成的教育交换索引（原文仍持久化；'
-                    '需要全文用read_lesson，摘要不是新验证或授权）：' + dumps({
+                    '需要全文用read_lesson，摘要不是新验证或授权；读取结果若已归档，'
+                    '须用read_file/read_draft取回，不能据缺失上下文断言文件没有某内容）：' + dumps({
                         'archived_hash': sha(dumps(archived)),
                         'prior_requests': [m['content'][:1000] for m in archived if m['role'] == 'user'][-8:],
                         'profile': self.education.profile(session['id']).model_dump(),
                         'calls': [{'id': c['id'], 'name': c['name'], 'ok': c['result']['ok'],
                                    'error': c['result'].get('error')} for c in calls if c['id'] in archived_ids]})})
-                messages = [messages[user_index], *messages[index:]]
+                messages = [messages[user_index], *reads, *messages[index:]]
         if len(dumps(messages).encode()) > 36000:
             # 只在完整教师轮次边界移除旧轮；原文、工具结果和授权仍在数据库。
             start = max(i for i, m in enumerate(messages) if m["role"] == "user")
@@ -235,16 +250,6 @@ class Agent:
                 run = self.store.get("runs", rid)
                 if run["status"] != "RUNNING":
                     return
-                if run["active_seconds"] >= self.settings.max_active_seconds:
-                    raise AppError("TIME_BUDGET", "已达到主动运行时间上限。", 409)
-                usage_records = self.store.find("usage")
-                mine = [u for u in usage_records if u["run_id"] == rid]
-                if (sum(u["input_tokens"] for u in mine) > self.settings.max_input_tokens
-                        or sum(u["output_tokens"] for u in mine) > self.settings.max_total_output_tokens
-                        or sum(u["cny"] for u in mine) > self.settings.max_run_cny
-                        or sum(u["cny"] for u in usage_records) > self.settings.max_project_cny
-                        or sum(u["cny"] for u in usage_records if u["session_id"] == sid) > self.settings.max_session_cny):
-                    raise AppError("BUDGET_EXCEEDED", "已达到 Token 或费用预算，本轮已停止。", 409)
                 session = self.store.get("sessions", sid)
                 pending = [c for c in self.store.find("calls", sid)
                            if c["run_id"] == rid and c["status"] != "DONE"]
@@ -252,17 +257,12 @@ class Agent:
                     call = pending[0]
                     if call["status"] == "WAITING":
                         return
-                    if run["tool_count"] >= self.settings.max_tools:
-                        raise AppError("TOOL_BUDGET", "已达到工具次数上限。", 409)
-                    remaining = self.settings.max_active_seconds - run["active_seconds"]
-                    tool_limit = self.registry.timeout_seconds(call["name"])
-                    duration = min(tool_limit, remaining)
+                    duration = self.registry.timeout_seconds(call["name"])
                     started = time.monotonic()
                     with self.store.tx():
                         self.registry.begin(call, session)
                         run["tool_count"] += 1
-                        # 中断也不能清零工具次数和本次时间预留；等待期间不持有数据库锁。
-                        run["active_seconds"] += duration
+                        # 次数与耗时只用于追溯；等待期间不持有数据库锁。
                         self.store.put("runs", run)
                         self.store.event(sid, rid, "tool.started",
                                          {"call_id": call["id"], "name": call["name"]})
@@ -275,9 +275,7 @@ class Agent:
                         if time.monotonic() - started >= duration:
                             raise TimeoutError
                     except TimeoutError:
-                        terminal_error = (AppError("TIME_BUDGET", "已达到主动运行时间上限。", 409)
-                                          if remaining <= tool_limit else
-                                          AppError("TOOL_TIMEOUT", "工具执行超时，迟到结果不会被采纳。", 503))
+                        terminal_error = AppError("TOOL_TIMEOUT", "工具执行超时，迟到结果不会被采纳。", 503)
                     with self.store.tx():
                         run = self.store.get("runs", rid)
                         call = self.store.get("calls", call["id"])
@@ -302,7 +300,7 @@ class Agent:
                             "ok": result["ok"], "fingerprint": fingerprint, "error": result["error"]}))
                         run["repeat_count"] = run["repeat_count"] + 1 if signature == run["last_signature"] else 1
                         run["last_signature"] = signature
-                        run["active_seconds"] += time.monotonic() - started - duration
+                        run["active_seconds"] += time.monotonic() - started
                         self.store.put("runs", run)
                     if terminal_error:
                         raise terminal_error
@@ -323,34 +321,27 @@ class Agent:
                         raise AppError("NO_PROGRESS", "相同工具连续三次没有进展，已停止。", 409)
                     await asyncio.sleep(0)
                     continue
-                if run["steps"] >= self.settings.max_steps:
-                    raise AppError("STEP_BUDGET", "已达到模型调用次数上限。", 409)
                 messages = self.context(session)
-                # UTF-8字节数加协议余量作为保守预留；实际用量由厂商 usage 结算。
-                estimate = len(dumps(messages).encode()) + len(dumps(schemas()).encode()) + 1024
                 prices = self.settings.prices()
-                reserved_time = min(self.settings.model_timeout_seconds,
-                                    self.settings.max_active_seconds - run["active_seconds"])
+                request_timeout = self.settings.model_timeout_seconds
                 with self.store.tx():
-                    usage = self.store.reserve(run, estimate, self.settings.max_output_tokens,
-                                               *prices, self.settings)
+                    usage = self.store.start_usage(run, *prices)
                     run["steps"] += 1
-                    run["active_seconds"] += reserved_time
                     self.store.put("runs", run)
                     self.store.event(sid, rid, "model.requested", {"step": run["steps"],
                                      "model": run["model"], "mock": session["mock"]})
                 started = time.monotonic()
                 try:
-                    async with asyncio.timeout(reserved_time):
-                        reply = await self.provider.complete(messages, schemas(), self.settings.max_output_tokens)
+                    async with asyncio.timeout(request_timeout):
+                        reply = await self.provider.complete(messages, schemas())
                 except (AppError, TimeoutError) as error:
                     if isinstance(error, TimeoutError):
-                        error = AppError("PROVIDER_TIMEOUT", "模型请求超时，费用预留已保留。", 503, True)
+                        error = AppError("PROVIDER_TIMEOUT", "模型请求超时，实际用量未知。", 503, True)
                     with self.store.tx():
                         if error.code == "API_KEY_MISSING":
                             usage.update(input_tokens=0, output_tokens=0, cny=0, status="NOT_SENT")
                             self.store.put("usage", usage)
-                        run["active_seconds"] += time.monotonic() - started - reserved_time
+                        run["active_seconds"] += time.monotonic() - started
                         run["retry_count"] += 1
                         self.store.put("runs", run)
                         self.store.event(sid, rid, "model.failed", error.payload())
@@ -360,7 +351,7 @@ class Agent:
                     raise error
                 with self.store.tx():
                     self.store.settle(usage, reply)
-                    run["active_seconds"] += time.monotonic() - started - reserved_time
+                    run["active_seconds"] += time.monotonic() - started
                     for call in reply.tool_calls:
                         if any(c["id"] == call.id for c in self.store.find("calls")):
                             raise AppError("DUPLICATE_CALL_ID", "模型重复使用工具调用ID，未执行本批工具。", 503)
@@ -395,7 +386,7 @@ class Agent:
             self.stop(rid, "INTERRUPTED", {"code": "PROCESS_INTERRUPTED", "message": "任务中断，可恢复。"})
             raise
         except AppError as error:
-            stopped = error.code in {"BUDGET_EXCEEDED", "TIME_BUDGET", "STEP_BUDGET", "TOOL_BUDGET", "NO_PROGRESS", "REPAIR_LIMIT"}
+            stopped = error.code in {"NO_PROGRESS", "REPAIR_LIMIT"}
             self.stop(rid, "STOPPED" if stopped else "FAILED", error.payload())
         except Exception:
             logging.exception("Agent执行发生内部异常")

@@ -14,10 +14,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('target', help='SSH别名或user@host；先交互登录')
     parser.add_argument('--domain', required=True, help='已指向宿主的演示域名')
-    parser.add_argument('--web-budget', type=float, default=12)
     args = parser.parse_args()
-    if not 0 < args.web_budget <= 12 or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-.' for c in args.domain):
-        parser.error('域名或演示预算不合法')
+    if any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-.' for c in args.domain):
+        parser.error('域名不合法')
     ssh = ['ssh', '-S', str(PROJECT_ROOT / '.runtime/ssh_control'), '-o',
            'UserKnownHostsFile=' + str(PROJECT_ROOT / '.runtime/ssh_known_hosts'), '-o', 'BatchMode=yes', args.target]
     def run(command, data=None, capture=False):
@@ -49,8 +48,7 @@ def main():
         'DASHSCOPE_BASE_URL=' + settings.dashscope_base_url, 'LLM_MODEL=' + settings.llm_model,
         'LLM_PROVIDER=bailian', 'YUNYUN_MODE=web', 'YUNYUN_DATA_DIR=/data',
         'YUNYUN_HOSTS=' + args.domain + ',127.0.0.1,localhost', 'YUNYUN_SECURE_COOKIE=true',
-        'RUNNER_SOCKET=/run/yunyun/runner.sock', 'RUNNER_TOKEN=' + token,
-        'MAX_PROJECT_CNY=' + str(args.web_budget), 'MAX_SESSION_CNY=6', '']))
+        'RUNNER_SOCKET=/run/yunyun/runner.sock', 'RUNNER_TOKEN=' + token, '']))
     write(root + '/runner.env', f'RUNNER_IMAGE={digest}\nRUNNER_SOCKET=/run/yunyun/runner.sock\nRUNNER_TOKEN={token}\n')
     run(f'chown -R 10001:10001 {root}/data {root}/socket')
     gid = run('stat -c %g /var/run/docker.sock', capture=True).stdout.decode().strip()

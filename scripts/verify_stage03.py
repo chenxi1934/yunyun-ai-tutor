@@ -24,9 +24,9 @@ def live_probe(socket, token, output):
     from app.verification.runner import RemoteRunner
 
     async def run():
-        # 沿用实例费用账本，禁止以临时数据库重置真实模型预算。
+        # 沿用实例用量记录，保留历史调用证据。
         settings = Settings(runner_socket=socket, runner_token=token,
-                            yunyun_mode='web', max_output_tokens=2048)
+                            yunyun_mode='web')
         if settings.llm_provider != 'bailian':
             raise RuntimeError('真实探针必须使用百炼，不能使用Mock')
         store = Store(settings.yunyun_data_dir / 'state.sqlite3')
@@ -63,13 +63,13 @@ def live_probe(socket, token, output):
             actual_usage = [u for u in data['usage'] if u['status'] == 'USAGE_ESTIMATE']
             assert len(actual_usage) >= 3
             assert all(u['provider_request_id'] and u['input_tokens'] > 0 for u in actual_usage)
-            assert all(u['status'] in {'USAGE_ESTIMATE', 'RESERVED_UNKNOWN'} for u in data['usage'])
-            data['unknown_usage_reservations'] = sum(u['status'] == 'RESERVED_UNKNOWN' for u in data['usage'])
+            assert all(u['status'] in {'USAGE_ESTIMATE', 'USAGE_UNKNOWN', 'RESERVED_UNKNOWN'} for u in data['usage'])
+            data['unknown_usage_reservations'] = sum(u['status'] in {'USAGE_UNKNOWN', 'RESERVED_UNKNOWN'} for u in data['usage'])
             assert len(agent.verification.delivery_candidates(session['id'])) == 1
             data['status'] = 'PASS'
             output.write_text(dumps(data), encoding='utf-8')
             return {'status': 'PASS', 'session_id': session['id'],
-                    'cny_estimate': sum(u['cny'] for u in data['usage'])}
+                    'cny_estimate': sum((u['cny'] or 0) for u in data['usage'])}
         finally:
             store.close()
     return asyncio.run(run())

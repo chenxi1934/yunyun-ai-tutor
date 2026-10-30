@@ -5,7 +5,7 @@
 交付：
 1. 创建 Python 3.12 FastAPI 后端、Pydantic 模型、SQLite 持久化、pytest；创建 React + TS + Vite 前端，基本页面和健康检查。
 2. 完成至少一个真实大模型 API 的 Provider：Key/URL/Model 通过 `.env` 配置，严禁写进代码和 Git；可准备 Mock LLM 兜底，但必须醒目标识。
-3. 实现真实 `AgentLoop`：模型返回结构化 tool calls、系统按工具白名单执行、把真实结果返回模型再推理，不是一个固定的生成流水线。设置最多步数、总时间、最大工具次数、费用/Token 预算与异常处理。
+3. 实现真实 `AgentLoop`：模型返回结构化 tool calls、系统按工具白名单执行、把真实结果返回模型再推理，不是一个固定的生成流水线。记录调用次数、耗时和实际用量，不设置最多步数、累计总时长、工具总次数或费用/Token预算；保留单次请求/工具超时和异常处理。
 4. 至少实现 `list_files`、`read_file`、`propose_patch`/草稿写入、`run_python_tests` 接口（Runner 可由阶段 3 完善，但不能伪造测试通过）。
 5. 实现 Workspace、path 校验、工具参数 Pydantic 校验和权限 Policy；读取授权文件和临时草稿自动执行，正式覆写/删除走待审批，不允许 Agent 用其他工具绕过审批。
 6. 实现 Session 的消息、工具记录、工作区与审批状态最小持久化；服务重启能够 resume，不能只还原聊天文本。

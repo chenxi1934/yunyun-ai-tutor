@@ -195,7 +195,7 @@ def verify_mode(settings, mode, evidence_dir, identity, startup_only=False):
                 require(len(tool_ids) == len(set(tool_ids)) == len(final["tool_calls"]), "工具结果丢失或被重复回填。")
                 result["checks"]["7"] = "PASS"
                 result["final_snapshot"] = final
-                result["estimated_and_reserved_cny"] = sum(u["cny"] for u in final["usage"])
+                result["estimated_and_reserved_cny"] = sum((u["cny"] or 0) for u in final["usage"])
                 result["sse_http"] = client.get(f"/api/sessions/{sid}/events?follow=false").status_code
                 result["status"] = "PASS"
             except Exception as error:
@@ -218,7 +218,7 @@ def verify_provider_failure(settings, evidence_dir, identity):
     with socket.socket() as closed, (evidence_dir / f"stage02-acceptance-failure-{identity}.log").open("w") as log:
         closed.bind(("127.0.0.1", 0))
         env = {**os.environ, "LLM_PROVIDER": "bailian", "YUNYUN_MODE": "web",
-               "YUNYUN_DATA_DIR": str(settings.yunyun_data_dir.resolve()), "MAX_OUTPUT_TOKENS": "128",
+               "YUNYUN_DATA_DIR": str(settings.yunyun_data_dir.resolve()),
                "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost",
                "DASHSCOPE_BASE_URL": f"http://127.0.0.1:{closed.getsockname()[1]}/compatible-mode/v1"}
         command = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port), "--no-access-log"]

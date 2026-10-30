@@ -60,7 +60,7 @@ class EducationService:
         result['items'] = {key: {k: value[k] for k in ('revision', 'review_status', 'verification_status', 'draft_id')
                                 if k in value} for key, value in view['items'].items()}
         dids = set(view['bindings'].values())
-        # 成功报告持久化可追溯；工具上下文只展开失败，避免重复整份教案耗尽预算。
+        # 成功报告持久化可追溯；工具上下文只展开失败，减少整份教案的重复回传。
         result['failures'] = [r for r in self.store.find('reports', view['session_id'])
                               if r['draft_id'] in dids and r['status'] != 'PASS']
         return result

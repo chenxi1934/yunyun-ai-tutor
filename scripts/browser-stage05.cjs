@@ -35,7 +35,8 @@ async function scenario(browser, name, url, stage, className, pc=false) {
     await page.locator('input[type=file]').setInputFiles(path.resolve('backend/seeds/core/class_B.csv'));
     await until(async()=>await page.getByRole('combobox',{name:'班情格式',exact:true}).inputValue()==='csv','读取班情CSV');
   } else await page.getByRole('button',{name:'使用'+className+'班',exact:true}).click();
-  await page.getByRole('textbox',{name:'备课需求',exact:true}).fill('读取工作区班情与示例，依据已导入班情为本学段备一节45分钟《循环结构》。生成完整结构化教案、2个示例、基础进阶挑战各1题含参考解与评分点，以及有班情依据的错因预警。请真实验证所有示例与参考答案，失败仅修代码并重测；等待教师审核。教学文字务必与实际代码一致。');
+  const request=process.env.YUNYUN_ACCEPT_REQUEST || '读取工作区班情与示例，依据已导入班情为本学段备一节45分钟《循环结构》。生成完整结构化教案、2个示例、基础进阶挑战各1题含参考解与评分点，以及有班情依据的错因预警。请真实验证所有示例与参考答案，失败仅修代码并重测；等待教师审核。教学文字务必与实际代码一致。';
+  await page.getByRole('textbox',{name:'备课需求',exact:true}).fill(request);
   await responseClick(page,page.getByRole('button',{name:'发送需求',exact:true}),'/messages');
   console.log(JSON.stringify({scenario:name,stage:'sent'}));
   let s=await until(async()=>{const s=await state(page);const run=s.runs.at(-1); if(run && ['FAILED','STOPPED'].includes(run.status)) throw Error(JSON.stringify(run.error));return run?.status==='COMPLETED'?s:false;},name+'真实生成',360000);
@@ -56,6 +57,15 @@ async function scenario(browser, name, url, stage, className, pc=false) {
   assert(s.tool_calls.some(c=>c.name==='get_education_context'));
   assert(s.tool_calls.some(c=>c.name==='propose_lesson'));
   assert(s.tool_calls.some(c=>c.name==='verify_lesson'));
+  fs.writeFileSync(path.join(evidence,`${stem}-${name}-generated.json`),JSON.stringify(s,null,2));
+  if(process.env.YUNYUN_FINAL_ACCEPTANCE) {
+    assert(s.tool_calls.some(c=>c.name==='list_files'&&c.result?.ok));
+    assert(s.tool_calls.some(c=>c.name==='read_file'&&c.result?.ok));
+    if(pc) assert(s.messages.some(m=>m.role==='assistant'&&typeof m.content==='string'&&m.content.includes(process.env.YUNYUN_ACCEPT_MARKER)), '回复必须使用只在真实文件中的随机标记');
+    const baseline=s.tool_calls.find(c=>c.name==='get_education_context'&&c.result?.ok).result.data.suggested_plan;
+    assert(lesson.plan.segments.filter(i=>i.activity!==baseline.segments.find(b=>b.id===i.id)?.activity).length>=2, '模型至少实际改写两个课堂活动');
+    assert(lesson.plan.examples.filter(i=>i.explanation!==baseline.examples.find(b=>b.id===i.id)?.explanation).length>=2, '模型至少实际改写两个示例讲解');
+  }
   assert.equal(lesson.plan.examples.length,2);assert.equal(lesson.plan.exercises.length,3);
   assert.equal(lesson.plan.segments.reduce((n,i)=>n+i.minutes,0),45);
   assert.deepEqual(lesson.plan.exercises.map(e=>e.level).sort(),['基础','进阶','挑战'].sort());
@@ -187,20 +197,32 @@ async function scenario(browser, name, url, stage, className, pc=false) {
   assert.equal((await other.request.post(`/api/sessions/${id}/drafts`,{data:{path:'README.md',content:'unauthorized',base_hash:null,operation:'write',expected_revision:s.session.revision}})).status(),404);
   await other.close();
   assert.deepEqual(errors,[]);
-  output.scenarios.push({name,status:'PASS',session_id:id,stage,className,lesson:lesson.plan,files:s.commits.at(-1).applied.length,cases:initialCases,refresh:'PASS',cookie_isolation:'PASS',javascript_errors:errors,synthetic_review:true,paths_denied:pathDenials,tool_names:s.tool_calls.map(c=>c.name),runner_identity:s.verification_reports.at(-1)?.runner_policy_hash,csv_upload:!pc&&className==='B'?'PASS':'NOT_APPLICABLE',download_loading:'PASS'});
+  const finalState=await state(page);
+  fs.writeFileSync(path.join(evidence,`${stem}-${name}-final.json`),JSON.stringify(finalState,null,2));
+  assert(finalState.usage.some(u=>u.status==='USAGE_ESTIMATE'&&u.provider_request_id&&u.input_tokens>0));
+  const usage={requests:finalState.usage.filter(u=>u.status==='USAGE_ESTIMATE').length,
+    input_tokens:finalState.usage.reduce((n,u)=>n+(u.input_tokens||0),0),
+    output_tokens:finalState.usage.reduce((n,u)=>n+(u.output_tokens||0),0),
+    cny_estimate:finalState.usage.reduce((n,u)=>n+(u.cny??0),0),
+    unknown_usage_requests:finalState.usage.filter(u=>['USAGE_UNKNOWN','RESERVED_UNKNOWN'].includes(u.status)).length};
+  output.scenarios.push({name,status:'PASS',session_id:id,stage,className,request,usage,lesson:lesson.plan,files:s.commits.at(-1).applied.length,cases:initialCases,refresh:'PASS',cookie_isolation:'PASS',javascript_errors:errors,synthetic_review:true,paths_denied:pathDenials,tool_names:s.tool_calls.map(c=>c.name),runner_identity:s.verification_reports.at(-1)?.runner_policy_hash,csv_upload:!pc&&className==='B'?'PASS':'NOT_APPLICABLE',download_loading:'PASS'});
   fs.writeFileSync(path.join(evidence,outputName),JSON.stringify(output,null,2));
   await context.close();
 }
 (async()=>{
  let chrome, safari;
  try {
-   if(process.env.YUNYUN_BROWSER_SCENARIO !== 'web-webkit-university') {
+   const selected=process.env.YUNYUN_BROWSER_SCENARIO || 'all';
+   assert(['all','pc-chrome-A','web-chrome-B','web-webkit-university'].includes(selected));
+   if(['all','pc-chrome-A','web-chrome-B'].includes(selected)) {
      chrome=await chromium.launch({executablePath:process.env.YUNYUN_CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
-     await scenario(chrome,'web-chrome-B',process.env.YUNYUN_WEB_URL,'初中','B');
-     await scenario(chrome,'pc-chrome-A',process.env.YUNYUN_PC_URL,'初中','A',true);
+     if(selected!=='pc-chrome-A') await scenario(chrome,'web-chrome-B',process.env.YUNYUN_WEB_URL,'初中','B');
+     if(selected!=='web-chrome-B') await scenario(chrome,'pc-chrome-A',process.env.YUNYUN_PC_URL,'初中','A',true);
    }
-   safari=await webkit.launch({headless:true,timeout:30000});
-   await scenario(safari,'web-webkit-university',process.env.YUNYUN_WEB_URL,'大学','A');
+   if(['all','web-webkit-university'].includes(selected)) {
+     safari=await webkit.launch({headless:true,timeout:30000});
+     await scenario(safari,'web-webkit-university',process.env.YUNYUN_WEB_URL,'大学','A');
+   }
    output.status='PASS';console.log(JSON.stringify({status:'PASS',scenarios:output.scenarios.map(s=>s.name)}));
  } finally {if(chrome)await chrome.close();if(safari)await safari.close();}
 })().catch(e=>{output.error=String(e.stack);console.error(e.stack);process.exitCode=1;}).finally(()=>{fs.writeFileSync(path.join(evidence,outputName),JSON.stringify(output,null,2));input.close();});

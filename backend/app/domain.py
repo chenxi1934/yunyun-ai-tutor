@@ -84,7 +84,7 @@ class ToolCall(BaseModel):
 
 class ModelReply(BaseModel):
     content: str | None = None
-    tool_calls: list[ToolCall] = Field(default_factory=list, max_length=24)
+    tool_calls: list[ToolCall] = Field(default_factory=list)
     finish_reason: str = "stop"
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)

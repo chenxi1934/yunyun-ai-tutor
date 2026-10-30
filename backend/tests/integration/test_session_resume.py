@@ -51,7 +51,7 @@ async def test_interruption_after_draft_does_not_replay_write(setup_agent):
     class Interruptible:
         count = 0
 
-        async def complete(self, messages, tools, max_tokens):
+        async def complete(self, messages, tools):
             self.count += 1
             if self.count == 1:
                 return reply(("propose_patch", {"path": "new.md", "content": "draft", "base_hash": None}))
@@ -76,7 +76,7 @@ async def test_interruption_after_draft_does_not_replay_write(setup_agent):
     assert not (root / "new.md").exists()
 
 
-def test_crashed_running_marked_interrupted_with_budget_retained(setup_agent):
+def test_crashed_running_preserves_usage_counters(setup_agent):
     agent, store, session, _ = setup_agent(ScriptedProvider())
     run = agent.new_run(session["id"], "请求", 0, "request-0001")
     with store.tx():
@@ -96,14 +96,27 @@ def test_crash_before_worker_starts_is_resumable(setup_agent):
     assert agent.prepare_resume(session["id"], 1)["id"] == run["id"]
 
 
-async def test_resume_rejects_policy_or_limit_change(setup_agent):
+async def test_resume_rejects_execution_timeout_change(setup_agent):
     agent, store, session, _ = setup_agent(ScriptedProvider(AppError("PROVIDER_AUTH", "无权", 503)))
     run = agent.new_run(session["id"], "请求", 0, "request-0001")
     await agent.run(run["id"])
-    changed = Agent(agent.settings.model_copy(update={"max_steps": 11}), store, ScriptedProvider())
+    changed = Agent(agent.settings.model_copy(update={"model_timeout_seconds": 59}), store, ScriptedProvider())
     with pytest.raises(AppError) as error:
         changed.prepare_resume(session["id"], 1)
     assert error.value.code == "CONFIG_CHANGED"
+
+
+async def test_resume_ignores_removed_limits_in_historical_config(setup_agent):
+    provider = ScriptedProvider(AppError('PROVIDER_AUTH', '鉴权失败', 503), reply(content='已恢复。'))
+    agent, store, session, _ = setup_agent(provider)
+    run = agent.new_run(session['id'], '请求', 0, 'legacy-resume')
+    await agent.run(run['id'])
+    saved = store.get('runs', run['id'])
+    saved['config']['limits'].update(max_steps=12, max_run_cny=3)
+    store.put('runs', saved)
+    agent.prepare_resume(session['id'], 1)
+    await agent.run(run['id'])
+    assert store.get('runs', run['id'])['status'] == 'COMPLETED'
 
 
 @pytest.mark.parametrize("mode", ["pc", "web"])

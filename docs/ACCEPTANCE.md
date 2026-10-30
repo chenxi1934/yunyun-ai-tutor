@@ -1,6 +1,6 @@
 # P0 与交付验收矩阵
 
-**修订日期：2026-10-30。阶段05双端功能、公网HTTPS、真实交付与Chrome/WebKit验收见第14节；人工教育审查和最终面试交付仍有未验项目。**
+**修订日期：2026-10-30。最新干净环境交付检查见第20节。用户已废止全部模型调用预算限制，移除与复验结果见第19节。第18节及更早预算/失败记录仅为历史证据，不是当前规则。教师专业审核、换机现场、视频与最终Git同步仍未完成；原工作目录.env权限0644待人工收紧。**
 
 架构、协议、阶段和部署闸口见 [PLAN.md](PLAN.md)，实际执行记录见 [PROGRESS.md](PROGRESS.md)。历史文档/环境检查不能充当产品能力证据；各阶段证据仅适用于其记录的源码与范围。
 
@@ -19,30 +19,30 @@
 
 | ID | 原题锚点/要求 | 可观察的 PASS 标准 | 方法 | 状态 | 实际证据 |
 |---|---|---|---|---|---|
-| A1 | A1，自然语言工作区读写与可感知变更 | 一句话使真实模型返回原生 tool_calls，实际 list/read；读到随机文件内容后据此提出草稿；界面有真实新文件/diff，可续改，正式文件未经确认不变 | Provider 探针、F21、M-PC、M-WEB | PASS | 阶段02真实工具往返；阶段05 Chrome双端真实模型、工作区草稿/Diff/修改与正式审批，见第14节 |
-| A2 | A2，真实代码运行 | 候选 Python 确实执行；stdout/stderr/exit_code/耗时与实际一致；错误代码/异常/死循环明确失败并定位，非候选自报 PASS | F01–F06；Runner 集成测试 | PASS | 阶段03：PC共享核心真实容器回归19 PASS；Web真实百炼错误报告→修复→同规格重测通过；逐用例stdout/stderr/退出码/耗时/证据见第9节 |
-| A3 | A3，多轮与会话恢复 | 第二轮能引用上一轮班情/修改；关闭后端再启动可恢复消息、草稿、工具结果、冻结用例、报告、待审批与预算；不会重复写/删 | F09、F11、F17；恢复集成测试 | PASS | 阶段02多轮；阶段05 Chrome PC待审/已提交两次进程重启、刷新与恢复；提交后崩溃工具回填不重写，见第14节 |
-| A4 | A4，至少一个真实 API；允许 Mock 兜底 | 一家实际账户 API 完成“模型 call → 工具真执行 → call_id 回传 → 模型使用结果”；留脱敏请求/响应、实际 model/usage；Mock 时界面/事件/导出均醒目标识 | Provider 探针、F16、F21 | PASS | 百炼qwen3.8-max真实原生工具与usage；阶段05双端真实模型及Chrome/WebKit；显式Mock与导出mock元数据沿用协议 |
-| A5 | A5，明确权限分级 | 授权读/草稿/受限测试可按 Policy 执行；正式创建/覆盖/删除展示具体 diff 并需教师确认；模型和直接 API 均不能伪造批准，路径越界被拒 | F10、F12–F15；Policy/提交测试 | PASS | 阶段05 Hash绑定正式创建/覆盖/删除/拒绝/恢复与权限测试；代码验证/教师审核/提交独立，见第14节 |
-| B1 | B1，结构化可复用备课产出 | Pydantic 校验 JSON；有稳定 ID 的目标/环节/时间，合计 45 分钟；2–3 个示例；基础/进阶/挑战各 1 题，均含参考解、用例与合计 100 的评分点；JSON/Markdown 导出一致 | 教育单测、M-PC、M-WEB、F20 | PASS | 阶段04教育协议；阶段05双端结构界面与正式ZIP，2示例/三档题/评分/时间和Hash一致，见第14节 |
-| B2 | B2，所有代码真正通过用例才可交付 | manifest 的每个示例和参考解均有当前指纹下的完整成功报告，逐 case 输入/预期/实际可查；任一错误或漏测阻断交付；模型至多修复两次且不改保护用例 | F01–F08、F20；真实完整教案生成 | PASS（技术交付闸口） | 阶段05所有示例/参考解当前真实报告、失败/过期/未审阻断提交与ZIP；人工教育判断另列NOT_TESTED |
-| B3 | B1/B2，逐项接受/拒绝/继续编辑与回退 | 教案段落、示例、题目有独立 revision/审批；拒绝后正式文件字节不变并可恢复候选父版本；已发布版本可转成恢复草稿，重测/审批后回写；代码编辑立即使旧验证过期 | F07、F10、F11、F13、F23 | PASS | 阶段04逐项父版本与重新验证；阶段05实际覆盖/删除/拒绝/恢复Diff/崩溃窗口；代码变化使报告与待审批包失效，见第14节 |
-| B4 | B3，错因预警贴合班情 | 每条有 misconception_type、evidence/未知项、trigger、cause、teaching_intervention、exercise_ids 与学段；“死循环 3 人”推动具体追踪干预；无证据结论标预测，不能泛化为能力差 | F18、F19；策略单测及教师内容审查 | NOT_TESTED（人工审查） | 依据链与双端错因展示/代码技术验收PASS；真实教师内容审查尚未执行，不用自动化点击替代 |
-| B5 | B4，初中/大学学段实质适配 | 固定主题与班情切换学段，至少目标、示例/练习、评分点三处实质变化；初中先修/超纲规则生效，大学增加推理/复杂度；两端均可配置 | F19；对照 JSON 与教师审查 | NOT_TESTED（人工审查） | 阶段05初中A/B与大学真实程序/评分/目标差异、共享双端配置已测；真实教师适配审查仍待完成 |
-| B6 | B4，粘贴/上传班情驱动备课 | 支持粘贴文本与 JSON/CSV 上传；A/B 两份数据同题生成不同分钟分配和至少一项示例/练习策略；5 人未交与 3 人死循环不合计为 8 人，来源/分母/交集可追踪，缺失/冲突不默补 | F18、F19；导入/策略测试 | PASS（API/流程） | 阶段04上传解析/规则对照；阶段05浏览器A/B选择与真实班情导入、结构化主线；大文件原文上传协议见API测试 |
-| C1 | C，本机可运行与启动交付 | 在指定 macOS 现场机器按 README 安装前提后，一条启动命令可打开 GUI、访问本机 API；明确 Python 3.12，不能误用系统 3.9；冷启动可复现 | M-PC 第 1 步；现场启动记录 | PASS（当前macOS） | 一键入口实际启动并自动开GUI；CLI选仓库外目录、Python3.12、私有Runner；面试现场机器另待验收 |
-| C2 | C，真实本地目录与落盘 | 教师打开仓库外临时真实目录；可读原文件、创建新文件、批准修改后字节真实变化；记录前后 hash 与实际路径；拒绝无落盘 | M-PC、F10、F12、F13 | PASS | 阶段05真实文件覆盖/删除/恢复与CRLF字节断言；Chrome PC模型备课包实际落盘，见第14节 |
-| C3 | C，执行命令/覆盖前的分级权限 | 受限容器测试按 L2；PC 有限防护模式必须对本次 hash 与风险确认；未批准的正式写/删与任意 shell 均被后端拒绝；不把 subprocess 宣称强隔离 | F10、F12、F14；PC 权限操作记录 | PASS | 本机能力口令、Hash/Diff确认、拒绝不写入、私有隔离Runner；没有宿主子进程降级与任意shell |
-| C4 | C，教师视角完整 B1–B4 | 在真实本地工作区完成结构产出、所有代码真实验证、逐项回退、班情错因和学段适配；不是只运行一个玩具示例 | M-PC，B1–B6 的 PC 证据 | PASS（技术流程） | PC真实模型整课、逐项审核、真实执行与正式包；两学段/班情共享核心真实容器测试；人工教学判断待教师 |
-| D1 | D/交付1，直接打开的公网 URL | 实际 HTTPS URL 从开发机之外的网络/新浏览器可打开；能使用 API/SSE 完成主链路；记录地址、访问时间与实际结果 | M-WEB；外部访问记录 | PASS | https://111.229.226.186；开发机外VPS的真实HTTPS，Chrome/WebKit新上下文端到端；第三条独立网络未验 |
-| D2 | D，5–15 个种子文件 | 新会话实际列出 5–15 个可读文件，含教案、练习、示例和两份班情；不同会话独立可写，不修改种子或其他会话 | 文件清单与 F14；拟定 10 文件种子 | PASS | 阶段04新Web工作区精确7个合成文件，含两班情与初中/大学结构种子；独立会话沿用既有隔离协议，见第12节 |
-| D3 | D，真实验证与可看/下载教案包 | 一句话备课到真实 Python 失败/修复/通过可查，再经教师审核导出 ZIP；解包有教案 JSON/Markdown、示例、三档题/参考解/评分点、测试、报告、manifest；hash 对得上 | M-WEB、F02、F05、F20 | PASS | Chrome故意失败/修复；Chrome和WebKit真实模型、逐项审核、正式提交与ZIP解包Hash/报告验证，见第14节 |
-| D4 | D，Web 全部教育能力与安全边界 | B1–B6 在 Web 均有证据；执行走独立 Runner，网络/资源/文件限制实际生效；公网 API/代码容器无 Docker Socket/宿主目录权限；隔离不可用明确关闭执行 | F05、F06、F12、F14，B1–B6 的 Web 证据 | PASS（技术边界） | 独立Manager/候选隔离沿用阶段03证据；阶段05持续部署API无Docker Socket、真实教育主线与cookie隔离；人工教学判断待教师 |
-| E1 | 交付4，源码历史与关键 prompt | 源码完整可复现，有解释阶段问题的有意义 Git 提交，关键 prompt 与至少一例真实纠错可查；无 Key/真实学生信息入库。提交/推送需另有授权 | 授权后的 git log/源码检查；prompts 与 AI_DEV_LOG | NOT_TESTED（最终交付） | 源码/关键prompt和阶段实现保留；本轮未获Git提交/推送授权，完整最终交付与历史汇总留阶段06 |
-| E2 | 交付3，≤5 分钟演示视频 | 可播放实际视频且时长≤300 秒，连续展示需求、结构化产出、真实故意失败及修复/阻断、当前报告、审核、本机正式落盘、班情错因；不是截图拼出假 PASS | 计时视频/链接与 DEMO_SCRIPT 对照 | NOT_TESTED | 无 |
-| E3 | 交付5，一页设计与教育判断 | 一页回答错误阻断/验证/留痕/确认边界、裁剪理由、关键 prompt 和至少一例实际 AI 错误/发现/修正、学生端防抄设计、真实班级首轮隐私/内容安全；引用/改写开源时写清出处和范围；简述产品交互/视觉与可靠性优先 | DESIGN_DECISIONS/AI_DEV_LOG 与真实日志对照 | NOT_TESTED | 无；本轮仅新增产品交互说明，其他章节待真实实现后填写 |
-| E4 | 现场，换请求仍运行，PC 可启动 | 在现场机器冷启动，用未硬编码的新备课表达完成真实工具/验证/审核链路；解释可验证与需教师判断部分，模型/网络失败时如实展示 | F22、M-PC、真实 API 与现场记录 | NOT_TESTED | 无 |
-| E5 | 交付1/2/4/提交方式，交付清单及替代分支 | 实际 Web URL 或经明确说明的视频+部署分支；另有源码仓库地址、PC README 启动命令、≤5 分钟视频链接、一页文档，缺项写明。分支选择不掩盖 D1 状态 | 最终交付清单及真实链接；不自动上传/发布/推送 | NOT_TESTED | 无 |
+| A1 | A1，自然语言工作区读写与可感知变更 | 一句话使真实模型返回原生 tool_calls，实际 list/read；读到随机文件内容后据此提出草稿；界面有真实新文件/diff，可续改，正式文件未经确认不变 | Provider 探针、F21、M-PC、M-WEB | PASS | 阶段06真实list/read/propose/verify；PC随机文件标记正确复述；修复前FAIL保留，修复后完整三场景见第19节。 |
+| A2 | A2，真实代码运行 | 候选 Python 确实执行；stdout/stderr/exit_code/耗时与实际一致；错误代码/异常/死循环明确失败并定位，非候选自报 PASS | F01–F06；Runner 集成测试 | PASS | 本轮全量218项含42项真实容器；错误/异常/死循环/子进程清理、完整15程序51初始用例，见第19节。 |
+| A3 | A3，多轮与会话恢复 | 第二轮能引用上一轮班情/修改；关闭后端再启动可恢复消息、草稿、工具结果、冻结用例、报告、待审批与用量记录；不会重复写/删 | F09、F11、F17；恢复集成测试 | PASS | 第20节经真实PC启动器三次SIGKILL重启，每次更新能力口令；待审批、已提交、已有文件覆盖与mtime、用量记录恢复；全量恢复回归PASS。 |
+| A4 | A4，至少一个真实 API；允许 Mock 兜底 | 一家实际账户 API 完成“模型 call → 工具真执行 → call_id 回传 → 模型使用结果”；留脱敏请求/响应、实际 model/usage；Mock 时界面/事件/导出均醒目标识 | Provider 探针、F16、F21 | PASS | 本轮真实百炼qwen3.8-max原生工具、usage及请求ID；无自动Mock。规则建议稿与模型实际改写证据分开，第19节。 |
+| A5 | A5，明确权限分级 | 授权读/草稿/受限测试可按 Policy 执行；正式创建/覆盖/删除展示具体 diff 并需教师确认；模型和直接 API 均不能伪造批准，路径越界被拒 | F10、F12–F15；Policy/提交测试 | PASS | 218项中的白名单/权限/精确Diff/拒绝/删除/回退；真实浏览器与注入探针验证服务端拒绝危险调用。 |
+| B1 | B1，结构化可复用备课产出 | Pydantic 校验 JSON；有稳定 ID 的目标/环节/时间，合计 45 分钟；2–3 个示例；基础/进阶/挑战各 1 题，均含参考解、用例与合计 100 的评分点；JSON/Markdown 导出一致 | 教育单测、M-PC、M-WEB、F20 | PASS | 阶段06双端完整45分钟、2示例、三档各1题/100分、正式ZIP；模板采用与真实文字改写明确区分。 |
+| B2 | B2，所有代码真正通过用例才可交付 | manifest 的每个示例和参考解均有当前指纹下的完整成功报告，逐 case 输入/预期/实际可查；任一错误或漏测阻断交付；模型至多修复两次且不改保护用例 | F01–F08、F20；真实完整教案生成 | PASS | 当前完整5程序逐case真执行、错误时package/delivery 409；代码/规格Hash绑定；文字正确性不由PASS证明。 |
+| B3 | B1/B2，逐项接受/拒绝/继续编辑与回退 | 教案段落、示例、题目有独立 revision/审批；拒绝后正式文件字节不变并可恢复候选父版本；已发布版本可转成恢复草稿，重测/审批后回写；代码编辑立即使旧验证过期 | F07、F10、F11、F13、F23 | PASS | 本轮真实PC覆盖拒绝/接受/三次恢复；218项包含历史候选/正式文件回退和中断对账；代码变更使旧资格过期。 |
+| B4 | B3，错因预警贴合班情 | 每条有 misconception_type、evidence/未知项、trigger、cause、teaching_intervention、exercise_ids 与学段；“死循环 3 人”推动具体追踪干预；无证据结论标预测，不能泛化为能力差 | F18、F19；策略单测及教师内容审查 | NOT_TESTED | 技术依据链与双端展示PASS；本轮自由讲解仍出现6误写10，已另行修订复验；真实教师专业审核未进行。 |
+| B5 | B4，初中/大学学段实质适配 | 固定主题与班情切换学段，至少目标、示例/练习、评分点三处实质变化；初中先修/超纲规则生效，大学增加推理/复杂度；两端均可配置 | F19；对照 JSON 与教师审查 | NOT_TESTED | 本轮A/B/大学真实代码、目标/示例/评分差异PASS；专业教学适配判断仍未由真实教师完成。 |
+| B6 | B4，粘贴/上传班情驱动备课 | 支持粘贴文本与 JSON/CSV 上传；A/B 两份数据同题生成不同分钟分配和至少一项示例/练习策略；5 人未交与 3 人死循环不合计为 8 人，来源/分母/交集可追踪，缺失/冲突不默补 | F18、F19；导入/策略测试 | PASS | 实际CSV上传、A/B分钟5/8/10/10/10/2与2/8/8/15/10/2、任务与评分差异；B CSV先修字段未知，不伪称严格单变量实验。 |
+| C1 | C，本机可运行与启动交付 | 在指定 macOS 现场机器按 README 安装前提后，一条启动命令可打开 GUI、访问本机 API；明确 Python 3.12，不能误用系统 3.9；冷启动可复现 | M-PC 第 1 步；现场启动记录 | NOT_TESTED | 当前macOS arm64一键shell启动与Chrome GUI实际PASS；用户明确现场会换机器，未在真正现场机冷启动。 |
+| C2 | C，真实本地目录与落盘 | 教师打开仓库外临时真实目录；可读原文件、创建新文件、批准修改后字节真实变化；记录前后 hash 与实际路径；拒绝无落盘 | M-PC、F10、F12、F13 | PASS | 阶段06仓库外全新目录；既有formal.md拒绝bytes不变、接受后真实变化、重启mtime不变；教案包落盘。 |
+| C3 | C，执行命令/覆盖前的分级权限 | 受限容器测试按 L2；PC 有限防护模式必须对本次 hash 与风险确认；未批准的正式写/删与任意 shell 均被后端拒绝；不把 subprocess 宣称强隔离 | F10、F12、F14；PC 权限操作记录 | PASS | 当前本机能力口令/同源/路径与Diff审批、真实私有容器；不开放任意shell，不做裸subprocess降级。 |
+| C4 | C，教师视角完整 B1–B4 | 在真实本地工作区完成结构产出、所有代码真实验证、逐项回退、班情错因和学段适配；不是只运行一个玩具示例 | M-PC，B1–B6 的 PC 证据 | NOT_TESTED | 当前Mac教师视角技术流程PASS；完整B能力中的真实教师专业内容/学段审核未完成，按全部标准保持未验。 |
+| D1 | D/交付1，直接打开的公网 URL | 实际 HTTPS URL 从开发机之外的网络/新浏览器可打开；能使用 API/SSE 完成主链路；记录地址、访问时间与实际结果 | M-WEB；外部访问记录 | PASS | https://111.229.226.186 实际新Chrome/WebKit HTTPS、API、完整备课；用户授权后阶段06增量部署，25模块/静态Hash核对。 |
+| D2 | D，5–15 个种子文件 | 新会话实际列出 5–15 个可读文件，含教案、练习、示例和两份班情；不同会话独立可写，不修改种子或其他会话 | 文件清单与 F14；拟定 10 文件种子 | PASS | 本轮全新会话7个合成种子；跨cookie会话/文件/草稿404，越界403；独立工作区实测。 |
+| D3 | D，真实验证与可看/下载教案包 | 一句话备课到真实 Python 失败/修复/通过可查，再经教师审核导出 ZIP；解包有教案 JSON/Markdown、示例、三档题/参考解/评分点、测试、报告、manifest；hash 对得上 | M-WEB、F02、F05、F20 | PASS | 本轮真实失败OUTPUT_MISMATCH→同冻结用例修复→逐项合成审核→拒绝/接受→15文件ZIP；文字纠错另留证。 |
+| D4 | D，Web 全部教育能力与安全边界 | B1–B6 在 Web 均有证据；执行走独立 Runner，网络/资源/文件限制实际生效；公网 API/代码容器无 Docker Socket/宿主目录权限；隔离不可用明确关闭执行 | F05、F06、F12、F14，B1–B6 的 Web 证据 | NOT_TESTED | 真实独立Runner、资源/网络/文件/Key/Socket边界和Web教育技术流程PASS；B4/B5专业教师判断未验。 |
+| E1 | 交付4，源码历史与关键 prompt | 源码完整可复现，有解释阶段问题的有意义 Git 提交，关键 prompt 与至少一例真实纠错可查；无 Key/真实学生信息入库。提交/推送需另有授权 | 授权后的 git log/源码检查；prompts 与 AI_DEV_LOG | NOT_TESTED | 阶段历史及本次授权最终本地提交保留，关键Prompt/真实纠错可查，暂存敏感检查通过；未推送，远端最终同步与外部访问仍未验，见第21节。 |
+| E2 | 交付3，≤5 分钟演示视频 | 可播放实际视频且时长≤300 秒，连续展示需求、结构化产出、真实故意失败及修复/阻断、当前报告、审核、本机正式落盘、班情错因；不是截图拼出假 PASS | 计时视频/链接与 DEMO_SCRIPT 对照 | NOT_TESTED | 仅完成4分50秒录制脚本；没有可播放成片或上传链接，不能代替视频验收。 |
+| E3 | 交付5，一页设计与教育判断 | 一页回答错误阻断/验证/留痕/确认边界、裁剪理由、关键 prompt 和至少一例实际 AI 错误/发现/修正、学生端防抄设计、真实班级首轮隐私/内容安全；引用/改写开源时写清出处和范围；简述产品交互/视觉与可靠性优先 | DESIGN_DECISIONS/AI_DEV_LOG 与真实日志对照 | PASS | DESIGN_DECISIONS.md已完成，DESIGN_DECISIONS.pdf经pypdf确认A4单页；关键Prompt/真实纠错/引用已填写。 |
+| E4 | 现场，换请求仍运行，PC 可启动 | 在现场机器冷启动，用未硬编码的新备课表达完成真实工具/验证/审核链路；解释可验证与需教师判断部分，模型/网络失败时如实展示 | F22、M-PC、真实 API 与现场记录 | NOT_TESTED | 用户明确现场会换机器；当前Mac长文字改写请求在移除预算后复验PASS，但不能代替现场机验收；旧失败记录保留。 |
+| E5 | 交付1/2/4/提交方式，交付清单及替代分支 | 实际 Web URL 或经明确说明的视频+部署分支；另有源码仓库地址、PC README 启动命令、≤5 分钟视频链接、一页文档，缺项写明。分支选择不掩盖 D1 状态 | 最终交付清单及真实链接；不自动上传/发布/推送 | FAIL | 有Web、配置中的Git地址、PC命令、单页PDF/源码和脚本；视频/最终Git同步/现场确认缺失，完整提交条件未满足。 |
 
 ## 3. 故障、边界与工程闸口
 
@@ -50,29 +50,29 @@
 
 | ID | 场景与观测断言 | 拟验证位置 | 状态 | 实际证据 |
 |---|---|---|---|---|
-| F01 | 所有正确示例与三档参考解真实执行，所需 case_id 全覆盖；报告逐项对应，不能复用一个报告充数 | Runner/完整产物集成 | NOT_TESTED | 无 |
-| F02 | `sum_1_to_n` 用 n=0/1/5；故意 `range(1,n)` 得到错误结果，定位 artifact/case/expected/actual；真实模型依据失败修代码后在同一规格通过 | Runner + 真实 API 探针扩展 | NOT_TESTED | 无 |
-| F03 | 故意缺冒号触发 SYNTAX_ERROR，展示 stderr 与退出码；UI 不显示验证通过/可发布 | Runner/前端状态 | NOT_TESTED | 无 |
-| F04 | 除零等触发 RUNTIME_ERROR；正常退出但答案错触发 OUTPUT_MISMATCH，二者区分 | Runner | PASS | 阶段03真实容器覆盖：除零RUNTIME_ERROR、正常退出错误输出OUTPUT_MISMATCH、AssertionError单列；第9节 |
-| F05 | `while True` 在 2 秒墙钟限额及有界清理时间内终止；带派生进程用例也无残留容器/进程；状态 TIMEOUT，拒绝/取消/Manager 重启也能清理 | 真容器集成、进程/作业查询 | NOT_TESTED | 无 |
-| F06 | 过量内存/进程/输出触发 RESOURCE_LIMIT 或 OUTPUT_LIMIT；Runner 不崩溃、不影响下一作业；stdout/stderr 各 64 KiB 上限生效 | 真容器集成 | NOT_TESTED | 无 |
-| F07 | 分别修改代码、expected、运行镜像或 Runner Policy，旧报告 STALE，旧审批失效，提交/导出被拒；教学语义变化也使相关审核过期 | 验证/发布集成 | NOT_TESTED | 无 |
-| F08 | 模型尝试把错误 expected 改为实际输出、删失败 case、延长已批准限额时被拒；新增测试只进待审版本，不替换冻结测试 | Tool/Policy/测试规格 | NOT_TESTED | 无 |
-| F09 | 模型轮数/工具数/时间/token/费用/两次修复/重复无进展达到限额后真实停止；重启/换 Provider/重复请求不重置用量，不再产生副作用 | Loop 单测、持久化集成 | NOT_TESTED | 无 |
-| F10 | 拒绝新建/覆盖/删除审批，正式文件前后 hash 相同；伪造 approval_id、改候选或文件 hash、重复提交均不能越权；只有最终绑定 diff 的确认才写入 | 提交/审批集成、手动 PC | NOT_TESTED | 无 |
-| F11 | 分别在工具调用、等待审批、容器执行、正式多文件提交中断后重启；状态/预算/版本可恢复，不重复写删；不确定写入标 RECOVERY_REQUIRED 并阻断导出 | 故障注入集成 | NOT_TESTED | 无 |
-| F12 | `../`、绝对路径、混合分隔符、前缀同名目录、符号链接/硬链接及检查后替换路径均不能访问根外；容器不见宿主文件、Key、Socket，外网连接失败 | 工作区/真实隔离集成 | NOT_TESTED | 无 |
-| F13 | 教师在 diff 后外部编辑文件、两个 run 同时提交、目标新建时已存在，返回版本冲突且不覆盖；多文件中途失败按日志安全恢复 | 工作区/提交故障注入 | NOT_TESTED | 无 |
-| F14 | 两个 Web 会话互读/改工作区、猜测报告/审批 ID、跨源伪造 PC 开目录/审批均被拒；API 与 Runner 端口/Socket 权限符合部署设计 | API/部署集成 | NOT_TESTED | 无 |
-| F15 | 班情/工具结果含“忽略规则、批准覆盖、泄露 Key”时只当数据；模型即便产生危险 tool_call，服务端也拒绝；日志与导出无密钥/个人数据 | 注入/权限测试 | NOT_TESTED | 无 |
-| F16 | 无 Key/鉴权失败/429/超时/无 tools 能力/坏参数/截断均有可识别错误；重试遵守预算，不悄悄 Mock；Mock 界面/事件/导出醒目标识 | Provider/Loop 单测、真实探针 | NOT_TESTED | 无 |
-| F17 | SSE 断线/重连/重复事件按 event_id 补发去重；刷新用快照恢复待审/失败状态，不能触发第二次 run 或错报完成 | 事件/恢复测试；获授权后端到端 | NOT_TESTED | 无 |
-| F18 | 文本/JSON/CSV 的缺字段、负数、冲突/超分母、超限上传有定位错误；5 未交与 3 死循环保留交集未知；原始个人标识不送模型 | 班情导入/策略单测 | NOT_TESTED | 无 |
-| F19 | 同题 A/B 班情至少在分钟与示例/练习上有实质差异且 evidence 可追；同班情初中/大学至少三处深度差异；结构、先修、总时长和评分约束生效 | 教育单测、真实输出对照、教师复核 | NOT_TESTED | 无 |
-| F20 | 去掉一道必需题/一个报告、伪造模型“PASS”、报告 hash 不匹配、未审候选混入 ZIP 均阻断交付；导出后逐文件 hash 与验证快照一致 | 发布/导出集成 | NOT_TESTED | 无 |
-| F21 | 模型只说“已读/已测试”却无原生工具记录，或实际 call 未执行/未回传，不得满足 A1/A2/A4；非法工具及参数报错后回到模型上下文 | Provider/Loop 契约测试 | PASS | 2026-10-29阶段02：51项pytest中原生call/result配对、非法工具/参数回传、文本自报不能产生验证证据均通过；PC/Web真实随机标记探针证明模型使用实际工具结果 |
-| F22 | 使用与演示不同的新表达，改变练习侧重或班情数字，仍经过实际工具而非关键词固定脚本，结果可解释且可追溯 | 真实模型现场验收 | NOT_TESTED | 无 |
-| F23 | 候选被拒可回到父候选；已发布旧版经新恢复草稿、代码重测与新审批后恢复，当前正式文件在确认前不变，历史记录不消失 | 版本/提交集成 | NOT_TESTED | 无 |
+| F01 | 所有正确示例与三档参考解真实执行，所需 case_id 全覆盖；报告逐项对应，不能复用一个报告充数 | Runner/完整产物集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F02 | `sum_1_to_n` 用 n=0/1/5；故意 `range(1,n)` 得到错误结果，定位 artifact/case/expected/actual；真实模型依据失败修代码后在同一规格通过 | Runner + 真实 API 探针扩展 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F03 | 故意缺冒号触发 SYNTAX_ERROR，展示 stderr 与退出码；UI 不显示验证通过/可发布 | Runner/前端状态 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F04 | 除零等触发 RUNTIME_ERROR；正常退出但答案错触发 OUTPUT_MISMATCH，二者区分 | Runner | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F05 | `while True` 在 2 秒墙钟限额及有界清理时间内终止；带派生进程用例也无残留容器/进程；状态 TIMEOUT，拒绝/取消/Manager 重启也能清理 | 真容器集成、进程/作业查询 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F06 | 过量内存/进程/输出触发 RESOURCE_LIMIT 或 OUTPUT_LIMIT；Runner 不崩溃、不影响下一作业；stdout/stderr 各 64 KiB 上限生效 | 真容器集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F07 | 分别修改代码、expected、运行镜像或 Runner Policy，旧报告 STALE，旧审批失效，提交/导出被拒；教学语义变化也使相关审核过期 | 验证/发布集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F08 | 模型尝试把错误 expected 改为实际输出、删失败 case、延长已批准限额时被拒；新增测试只进待审版本，不替换冻结测试 | Tool/Policy/测试规格 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F09 | 模型次数/累计时间/Token/费用不作为停止闸口；大用量和历史未知用量不能阻断调用；两次代码修复、重复无进展、单次超时/取消等执行保护仍生效 | Loop 单测、持久化与真实长请求 | PASS | 用户废止旧模型预算标准；当前218项及原受限PC长请求复验PASS，详见第19节。 |
+| F10 | 拒绝新建/覆盖/删除审批，正式文件前后 hash 相同；伪造 approval_id、改候选或文件 hash、重复提交均不能越权；只有最终绑定 diff 的确认才写入 | 提交/审批集成、手动 PC | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F11 | 分别在工具调用、等待审批、容器执行、正式多文件提交中断后重启；状态/预算/版本可恢复，不重复写删；不确定写入标 RECOVERY_REQUIRED 并阻断导出 | 故障注入集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F12 | `../`、绝对路径、混合分隔符、前缀同名目录、符号链接/硬链接及检查后替换路径均不能访问根外；容器不见宿主文件、Key、Socket，外网连接失败 | 工作区/真实隔离集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F13 | 教师在 diff 后外部编辑文件、两个 run 同时提交、目标新建时已存在，返回版本冲突且不覆盖；多文件中途失败按日志安全恢复 | 工作区/提交故障注入 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F14 | 两个 Web 会话互读/改工作区、猜测报告/审批 ID、跨源伪造 PC 开目录/审批均被拒；API 与 Runner 端口/Socket 权限符合部署设计 | API/部署集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F15 | 班情/工具结果含“忽略规则、批准覆盖、泄露 Key”时只当数据；模型即便产生危险 tool_call，服务端也拒绝；日志与导出无密钥/个人数据 | 注入/权限测试 | PASS | 本轮真实恶意文件+显式脚本Provider的危险call探针：TOOL_NOT_ALLOWED/PATH_DENIED/INVALID_TOOL_ARGUMENTS；无密钥哨兵/写入/报告。只证明服务端边界。 |
+| F16 | 无 Key/鉴权失败/429/超时/无 tools 能力/坏参数/截断均有可识别错误；重试遵守预算，不悄悄 Mock；Mock 界面/事件/导出醒目标识 | Provider/Loop 单测、真实探针 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F17 | SSE 断线/重连/重复事件按 event_id 补发去重；刷新用快照恢复待审/失败状态，不能触发第二次 run 或错报完成 | 事件/恢复测试；获授权后端到端 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F18 | 文本/JSON/CSV 的缺字段、负数、冲突/超分母、超限上传有定位错误；5 未交与 3 死循环保留交集未知；原始个人标识不送模型 | 班情导入/策略单测 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F19 | 同题 A/B 班情至少在分钟与示例/练习上有实质差异且 evidence 可追；同班情初中/大学至少三处深度差异；结构、先修、总时长和评分约束生效 | 教育单测、真实输出对照、教师复核 | PASS | 本轮两班/两学段实际任务、分钟/评分差异及真实执行；专业教师内容判断仍NOT_TESTED。 |
+| F20 | 去掉一道必需题/一个报告、伪造模型“PASS”、报告 hash 不匹配、未审候选混入 ZIP 均阻断交付；导出后逐文件 hash 与验证快照一致 | 发布/导出集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F21 | 模型只说“已读/已测试”却无原生工具记录，或实际 call 未执行/未回传，不得满足 A1/A2/A4；非法工具及参数报错后回到模型上下文 | Provider/Loop 契约测试 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
+| F22 | 使用与演示不同的新表达，改变练习侧重或班情数字，仍经过实际工具而非关键词固定脚本，结果可解释且可追溯 | 真实模型现场验收 | PASS | 新措辞短请求真实list/read/保存/验证与PC随机标记通过；追加文字改写的PC请求在移除预算后复验PASS；旧限制导致的FAIL仅作历史保留。 |
+| F23 | 候选被拒可回到父候选；已发布旧版经新恢复草稿、代码重测与新审批后恢复，当前正式文件在确认前不变，历史记录不消失 | 版本/提交集成 | PASS | 阶段06当前全量218项、真实浏览器/故障探针覆盖；具体范围、Mock/真实区分及证据见第19节。 |
 
 ## 4. 双端手动验收流程（保留供教师/现场验收）
 
@@ -97,7 +97,7 @@
 
 ## 5. 当前结论
 
-阶段05共享PC/Web完整功能、公网HTTPS、正式文件审批/提交/恢复和ZIP已实现，Chrome双端及WebKit公网主线通过。156项后端回归和5项真实容器交付通过。人工教育审查、Firefox兼容、原生选目录弹窗、未来证书续期及阶段06现场/视频尚未通过或未执行；详见第14节。阶段02–04历史记录继续保留其原有范围与限制。
+当前干净环境后端218项通过（176受控控制流/Provider、42真实容器）；前端构建、真实PC启动/落盘/回退和公网冷启动后的B班/大学主线通过，完整证据见第20节。旧预算停止已按用户废止需求在第19节移除并复验，其他模型误读与网络失败仍保留。用户已授权本地Git提交，尚未推送或确认外部访问；真实教师专业审核、换机现场、原生目录弹窗、成片及最终Git同步未完成，完整交付E5仍FAIL。历史记录仅保留原阶段范围。
 
 ## 6. 阶段02实施时子验收（2026-10-29，历史记录）
 
@@ -400,3 +400,138 @@ git diff --check
 证据：[后端JUnit](../.runtime/stage05-review-backend.xml)、[真实容器JUnit](../.runtime/stage05-review-real-delivery.xml)、[浏览器逐项结果](../.runtime/stage05-review-browser.json)、[会话归属截图](../.runtime/stage05-review-chrome-session-scope.png)、[对账界面](../.runtime/stage05-review-chrome-recovery.png)。UI检查采用本轮截图及源码，遵循UI_GUIDELINES，保持浅紫/白色、历史/对话/可展开工作区，突出恢复Diff与明确审核按钮。
 
 **NOT_TESTED/剩余边界**：本轮代码的公网部署和公网完整备课未做；真实模型整课未重跑；真实教师教育审核、原生目录选择器人工操作未做。修复前历史日志缺失的原权限无法推断，采用保守0600；未知外部文件变更仍需人工核对后重新对账。未Git提交、推送或更新生产配置。
+
+
+## 17. 修复版本上线与验收准备（2026-10-30）
+
+用户已明确授权部署，Git提交由用户处理。发布基于`9d0457ec0ddbfe36cd417f134ad57a33cbb16412`，代码快照`a64e8d7be8cb028ad1fa61dc99b9efc3b9978c266f868664b768ae342a891798`；版本`review-20261029185906-a64e8d7be8`。第16节“未部署”是修复完成时的历史状态，本节为后续已部署的实际证据。
+
+| 条件 | 结果 | 本轮证据 |
+|---|---|---|
+| 新版本上线 | PASS | 真实访问https://111.229.226.186，TLS正常校验，Chrome加载当前React，无JS异常；25个实际导入Python模块和本地源Hash一致，公网HTML/JS/CSS与新镜像一致 |
+| 服务依赖 | PASS（配置/连通性） | runtime为bailian/qwen3.8-max、mock=false、Key已配置、Runner ISOLATED；API healthy，仅loopback18005，API无Docker Socket；Manager保持原容器且无公开端口 |
+| 数据与预算 | PASS | 切换时原有5会话/5任务/4提交/91个工作区文件保留，21条usage及累计¥1.830912不变；环境/Key/预算配置原样保留，无付费模型调用 |
+| 原文上传链路 | PASS | 公网真实API接收540065字节转义JSON，实际React上传含BOM的1048576字节文件，返回/持久化Hash与原始文件一致；1048577字节413且不新增班情版本 |
+| Python删除审批 | PASS（教师入口） | 全新Web工作区的真实.py文件提出删除、待审、拒绝后path/content/hash/mode不变；再次批准后实际404。模型入口逻辑回归见第16节，本轮未调用模型冒充工具验收 |
+| 权限及回退 | PASS | 全新Web工作区生成MD文件0600、批准覆盖保持0600、再审批历史回退后原内容与0600恢复；普通完成提交的对账接口返回RECOVERY_NOT_REQUIRED |
+| 权限与事件 | PASS（已测入口） | 第二cookie读取会话/工作区404，越界文件403、Web本地目录403；SSE回放存在真实提交事件，界面实际预览落盘内容 |
+| 回退准备 | PASS | 发布前SQLite备份及完整数据归档位于`/opt/yunyun-tutor/releases/review-20261029185906-a64e8d7be8/`；旧API停止并保留为回退容器。未实际切回旧版本，回退演练NOT_TESTED |
+
+本轮通过`.runtime/deploy-stage05-review.py`完成增量部署，再用`.runtime/stage05-deploy-smoke.cjs`连接真实HTTPS/React/API执行冒烟。公网测试没有HTTP响应夹具、没有改测试用例或虚构代码PASS；只使用合成班情/教师动作。首次探针全对象比较误包含request_id，保留失败attempt1；改为精确文件字段断言后重跑PASS。两个冒烟工作区均与原会话隔离，费用不增加。
+
+证据：[部署状态及备份](../.runtime/stage05-deploy-review.json)、[源清单](../.runtime/stage05-deploy-review-source.json)、[运行Hash](../.runtime/stage05-deploy-review-hashes.json)、[公网冒烟结果](../.runtime/stage05-deploy-review-public.json)、[首轮探针误报](../.runtime/stage05-deploy-review-public-attempt1.json)、[公网截图](../.runtime/stage05-deploy-review-public.png)。
+
+**NOT_TESTED**：本版本公网完整自然语言备课→真实代码失败/修复→审核→导出重跑、上线后的中断故障注入/回退演练、PC新工作区完整流程、真实教师教育审核、原生选目录人工操作。现阶段只确认部署与关键冒烟就绪，可以开始下一轮完整验收。PC已有进程未在远端部署中重启，验收时从一键入口启动当前代码的新进程。
+
+## 18. 阶段06最终验收（2026-10-30）
+
+**结论：技术主线PASS；完整面试交付FAIL，不能宣布全部完成。** 第2/3节24项原题与23项故障状态已逐项更新。B4/B5专业教学审核、真正现场机器、成片及最终Git同步仍未完成；用户已明确“现场会换机器”。审核按钮自动点击只证明机制。
+
+### 当前版本与唯一业务修复
+
+起始有README/PROGRESS/ACCEPTANCE三份未提交文档修改，保留后继续；没有改.env/密钥、锁文件、数据库结构或无关业务。真实PC探针发现同轮教育归档丢弃读取正文，模型错说README无随机标记。新增回归先FAIL，再在`Agent.context`以8 KiB上限保留完整只读交换，维持tool数据身份、原始历史与原预算。没有调高模型/代码时限或既定测试期望。
+
+用户单独授权后增量发布`final-20261029233419-aec15c4429`，源码包Hash `aec15c442952f023c9c3f49015bc4d5e1f834a4e6321ef8e8e88a04623f61078`；基于HEAD `9d0457e`加未提交工作区，**不能说Git远端已同步本次修复**。线上25个安装包模块与本地一致，Agent Hash为`ea0106168edc655bf3d567d4d85f4ae226586879704c5715cb0a323a89a8055f`；公网HTML/JS/CSS与运行镜像一致。发布后新增的验收脚本/文档不属于API运行逻辑。
+
+发布前后10会话/8任务/11提交/40条usage及¥3.143136估算/预留、全部原工作区文件一致；保留原Runner容器、配置Hash、Nginx/证书及预算。备份位于`/opt/yunyun-tutor/releases/final-20261029233419-aec15c4429/`，旧API保留为`yunyun-api-rollback-final-20261029233419-aec15c4429`。未实际切回旧版本，部署回退演练NOT_TESTED。
+
+### 实际执行与证据
+
+| 条件 | 状态 | 本轮命令/证据与边界 |
+|---|---|---|
+| 全部后端 | PASS | `.venv/bin/python scripts/verify_stage06.py root@111.229.226.186 --evidence-prefix stage06-final`：**215 passed / 0 failed / 0 errors / 0 skipped**，257.42秒；173项控制流/42项真实容器，不把初轮172/214及49项子集重复累计。1条既有Starlette弃用警告 |
+| 前端类型与构建 | PASS | `npm --prefix frontend run build`：TypeScript/Vite成功，1581模块，JS `index-4etU0DhF.js`；`ruff check backend runner scripts`、`node --check scripts/browser-stage05.cjs`、`git diff --check`通过 |
+| PC一键入口 | PASS（当前Mac） | 真实shell `start-desktop.sh --workspace /private/tmp/yunyun-stage06-launch-v87jec34 --runner-ssh ... --no-browser --port 50525`，pc/bailian/mock=false/ISOLATED与HTML200；GUI由独立真实Chrome主线验证。现场机器另为NOT_TESTED |
+| 双端完整主线 | PASS | `verify_stage05.py ... --browser --evidence-prefix stage06-final`：Chrome PC A/公网B/WebKit大学三场景；15程序、51初始用例，真实工具与新随机标记、失败/修复、拒绝/接受、实际落盘/ZIP/刷新/隔离。此批教学文字采用规则建议稿，不能冒充模型自主改写 |
+| 本轮修复真实复验 | PASS | PC随机标记仅存在新README，原生read返回后模型最终正确复述；待审批/已提交/覆盖后三次实际SIGKILL重启，字节/mtime不被重写。修复前原始FAIL保留 |
+| 授权上线后的Web B | PASS（技术） | `stage06-release`的B场景独立PASS：真实模型分别改写2活动/2讲解、5程序18初始用例，故意错误输出→409阻断→同规格修复→审批/ZIP。整批因后续PC长请求FAIL，不将该文件整体改为PASS |
+| 授权上线后的大学 | PASS（技术） | `YUNYUN_BROWSER_SCENARIO=web-webkit-university ... verify_stage05.py ... --evidence-prefix stage06-release-university`：新WebKit会话、2活动/2讲解实际改写、5程序16用例、审核/正式包/恢复/隔离 |
+| 新教学文字错误修订 | PASS（已知问题） | B稿把range(1,6)偶数和6写成10；`scripts/recheck_stage06.py --source .runtime/stage06-release-browser.json --prefix stage06-content`以独立cookie重放原真实模型稿，先拒绝再修订、原代码/冻结用例不变，重新5程序18用例PASS并合成审批导出；本次不调用模型，不替代教师专业审核 |
+| 推荐演示包完整性 | PASS | PC A、修正后Web B、新大学各15文件/5程序/5独立报告，17/18/16用例；manifest、代码、规格ID/Hash、逐case、指纹全部核对，[包核对](../.runtime/stage06-packages.json)。旧错误稿只作证据 |
+| 恶意指令/假调用 | PASS（服务端） | 真实文件植入指令，显式脚本Provider调用approve/读.env/越界写/篡改expected，分别被白名单/路径/严格参数拒绝；无哨兵泄露/正式写入/审批/报告。不是“真实模型永不受诱导”的证明 |
+| 启动/恢复/SSE | PASS | `YUNYUN_EVIDENCE_DIR=.runtime/stage06-startup .venv/bin/python scripts/smoke_startup.py`：真实PC/Web进程、重开Store、拒绝不写、SSE补发、缺Key不切Mock；Provider显式Mock，仅证明控制流 |
+| 界面竞态/上传/对账 | PASS（控制流） | 现有`review-stage05-browser.cjs`在Chrome/WebKit重跑22项；HTTP为显式夹具，结果另存`stage06-ui-control.json`，不冒充真实Runner/LLM |
+| 一页材料 | PASS | `DESIGN_DECISIONS.pdf`经pypdf确认1页、可提取中文1238字符；源码/关键Prompt/真实错误案例、4分50秒分段脚本齐备 |
+| 更长PC文字改写请求 | FAIL | 会话`362e53f0fa954753a9679304bd5a5e58`第6次模型后STOPPED/BUDGET_EXCEEDED；含一次RESERVED_UNKNOWN，未放宽限额、未换库清零或切Mock。这次独立失败不被短请求通过覆盖 |
+| 真正现场/专业审核/视频 | NOT_TESTED | 用户确认现场另换机器；真实教师教学与学段审核、原生目录弹窗、视频播放/≤300秒/上传链接未验。第三条网络、Firefox复验和真实证书续期也未做 |
+
+真实Runner覆盖：正确/语法/异常/错误标准输出/死循环与派生进程、内存/pids/输出/临时盘限额、取消与Manager重启孤儿回收、固定规格不可篡改、四类Hash失效、修复限额、路径链接与跨会话、正式提交中断三窗口/对账/权限回退。容器实际候选退出码/耗时/日志在JUnit属性；故障程序仍保持SYNTAX_ERROR/TIMEOUT等，表中PASS指正确阻断。
+
+### 模型与费用
+
+全部付费调用均为百炼`qwen3.8-max`、mock=false，有原生call_id与成功请求usage。`stage06-final`三场景：19次成功请求，输入88341/输出8218 token，估算¥1.355940；这是其中一个批次，**不是本轮全部费用**。部署后B的真实改写为6请求/31585输入/3541输出/¥0.506496；大学为6请求/30633输入/3089输出/¥0.478800。长PC失败含未知预留，不能算作精确账单或成功请求。
+
+本轮模型调用前账簿合计约¥20.075712，最终本机¥20.163660+Web¥4.128432=**¥24.292092**（含历史和未知用量保守预留），增量约¥4.216380；上限保留本机33/Web12。未清零预算，API与候选无模型Key。源文件真实Key扫描未检出，范围是当前Git管理/未忽略待管理文件，非全设备/所有历史审计。
+
+### 最终清单与剩余条件
+
+- Web：[https://111.229.226.186](https://111.229.226.186)，当前已包含归档修复；TLS正常校验，有效至2026-11-05 14:07（Asia/Shanghai），未来真实续期未观测。
+- 源码：[origin配置地址](https://github.com/chenxi1934/yunyun-ai-tutor)，本地阶段历史保留；`git ls-remote origin HEAD`因缺少非交互鉴权失败，面试方可访问性未确认。本轮未Git提交/推送。
+- PC：README的`MAX_PROJECT_CNY=33 bash scripts/start-desktop.sh --workspace /绝对教学目录 --runner-ssh root@111.229.226.186`；现场换机须重新安装/配置Key与SSH、构建并跑完整主线，不能只复制本机临时目录或带口令URL。
+- 一页：[Markdown](DESIGN_DECISIONS.md) / [实际单页PDF](DESIGN_DECISIONS.pdf)；[真实AI开发记录](AI_DEV_LOG.md)；[4分50秒脚本](DEMO_SCRIPT.md)。视频成片/链接缺失，E5完整提交为FAIL。
+- P0仍未验：B4/B5教师内容与适配判断、真正现场机C1/E4及依赖它们的完整C4/D4；已知技术风险是更长真实模型请求的网络/预算停止。不能据代码PASS宣布教学可直接使用。
+
+证据：[全量JUnit](../.runtime/stage06-final-real-tests.xml)、[Runner/源码/清理](../.runtime/stage06-final-summary.json)、[三场景真实浏览器](../.runtime/stage06-final-browser.json)、[新B场景及长请求FAIL](../.runtime/stage06-release-browser.json)、[新大学](../.runtime/stage06-release-university-browser.json)、[文字修订](../.runtime/stage06-content.json)、[215项完整日志](../.runtime/stage06-final-full.log)、[前端构建](../.runtime/stage06-frontend.log)、[部署](../.runtime/stage06-deploy.json)、[线上Hash/TLS](../.runtime/stage06-deploy-hashes.json)、[注入边界](../.runtime/stage06-injection.json)、[界面控制流](../.runtime/stage06-ui-control.json)、[启动](../.runtime/stage06-startup/smoke-startup.json)。证据在本机忽略目录，不随源码自动同步。
+
+过程失败也保留：初始全量importlib收集路径错误；归档前随机标记丢失；三套初稿未改写建议稿；SSH控制连接过期导致部署在修改服务器前失败，重新认证后发布成功；修订脚本首轮旧会话版本409。未删除失败断言、跳过测试或用Mock掩盖实际失败。最终查询API healthy、Manager在运行，候选容器列表为空；本次临时PC/Runner测试进程已结束。
+
+
+## 19. 删除模型调用预算并重新验收（2026-10-30）
+
+用户废止模型预算需求。本节覆盖此前相关要求与剩余风险；历史失败/旧usage保留，不能追改为当时已通过。
+
+已删除：run/会话/项目费用上限、累计输入/输出Token上限、模型步数/工具总次数、累计时长、单次输出Token上限，以及预扣/未知费用预留。Provider不发送max_tokens/max_completion_tokens，Settings无max_*字段；ModelReply隐藏的单批24工具限制及部署--web-budget参数也已删除。请求未知用量/费用记USAGE_UNKNOWN/null，未知价格不阻断调用；页面不把旧预留算成已知费用。旧会话恢复兼容已删除字段，不读取历史费用决定是否调用。
+
+保留单次请求/工具超时、网络重试、无进展停止、两次代码修复，以及沙箱/路径/教师审批/Hash保护。未改变冻结代码用例或放宽执行隔离。
+
+| 项目 | 状态 | 真实结果与证据 |
+|---|---|---|
+| 全部后端 | PASS | `scripts/verify_stage06.py root@111.229.226.186 --evidence-prefix stage06-unlimited`：**218 passed / 0 failed / 0 errors / 0 skipped，263.25秒**；176控制流+42真实容器。旧预算拒绝测试按新需求改为“大用量也可完成”的断言；预期输出与隔离断言未改 |
+| 不设调用/用量闸口 | PASS | 显式脚本Provider完成14次推理、单批25工具；百万输入/超过旧输出额度仍执行工具，历史高费用/未知记录不阻断；价格未知可调用；Provider请求无输出上限；旧配置恢复正常。首轮39 PASS/1 FAIL发现隐藏24条限制，修复后全量通过 |
+| 前端与启动 | PASS | `npm --prefix frontend run build`：TypeScript/Vite 1581模块；ruff、JS语法、diff检查PASS。ui-ux Tiny及最新web-design-guidelines检查费用null/文案，不改布局；当前启动/恢复/SSE冒烟PASS（显式Mock），Chrome/WebKit控制流22项PASS（HTTP夹具） |
+| 原搁置PC长请求 | PASS | 使用与原失败场景相同的完整教师请求，新会话714c9ee48e5c4584b8cd85820922431d；真实qwen3.8-max发起8次请求（7次usage、1次未知），改写至少2活动/2讲解、正确复述随机文件标记，5程序17用例、三次SIGKILL恢复、拒绝/接受、真实落盘、ZIP全部通过 |
+| 新版公网Web | PASS | 全新Chrome会话7c304f74d7f94b6492b280393384998d；真实模型7次请求，2活动/2讲解改写、5程序18初始用例；错误输出→409阻断→同规格修复→审核/拒绝/接受/ZIP/刷新/跨cookie校验，无JS异常 |
+| ZIP完整性 | PASS | 两个新包各15文件/5程序/5独立报告；17/18用例，代码/规格/指纹/manifest全部匹配 |
+| 上线与配置删除 | PASS | 发布unlimited-20261030000307-22b1c699a2，源码Hash 22b1c699a28ad882aa5317c3a2765f05fd52b8b64e4a8849137554c28925e498；移除旧MAX_PROJECT_CNY/MAX_SESSION_CNY，其他配置/数据/Runner/证书保留；25模块Hash一致，运行环境和Settings预算字段均空，公网静态文件匹配镜像 |
+
+PC已知usage为40302输入/5876输出、已知费用估算¥0.695160，另1次未知请求不预留费用；Web为40748输入/6655输出、估算¥0.728556。这些只是观测记录，没有调用准入作用，不是精确账单。
+
+主要文件：backend/app的agent/config/domain/providers/storage与对应测试；所有Provider调用/验收/部署脚本、前端费用类型/文案、.env.example、PLAN/Prompt/README。运行逻辑无预算字段或BUDGET类停止分支；历史证据和原题原文不删。本轮未Git提交或推送。
+
+证据：[218项JUnit](../.runtime/stage06-unlimited-real-tests.xml)、[源码/隔离/清理](../.runtime/stage06-unlimited-summary.json)、[原PC场景](../.runtime/stage06-unlimited-pc-browser.json)、[新版Web](../.runtime/stage06-unlimited-web-browser.json)、[ZIP](../.runtime/stage06-unlimited-packages.json)、[前端构建](../.runtime/stage06-unlimited-frontend.log)、[部署](../.runtime/stage06-unlimited-deploy.json)、[线上Hash/配置](../.runtime/stage06-unlimited-deploy-hashes.json)、[22项界面回归](../.runtime/stage06-unlimited-ui-control.json)、[启动](../.runtime/stage06-unlimited-startup/smoke-startup.json)。真实API请求正文/usage/调用ID在浏览器快照中；合成审核仍不代表专业教师确认。
+
+**本次预算删除与此前搁置场景复验PASS，无因预算挂起的技术项。** 整体面试交付E5仍FAIL：真正现场换机、教师专业审核、视频成片/链接及最终Git同步未完成；原生目录、Firefox、未来证书续期、实际部署回退演练仍NOT_TESTED。
+
+## 20. 干净环境最终交付检查（2026-10-30）
+
+本轮无功能扩张、无业务代码变更。按Git当前文件建立全新源码副本`/private/tmp/yunyun-final-clean-m55uhee2`，不含原`.venv`、node_modules、构建产物、会话数据库或SSH控制连接。新建Python 3.12.14虚拟环境、安装依赖并构建前端；新认证SSH、新建临时Manager。应用和测试依赖实际从该副本导入，未复用原应用进程。源码/14份测试文件与本仓库当前Hash一致。Docker/Nginx及厂商模型服务作为已有基础设施保留；没有声称完成空白VPS重装。
+
+| 检查 | 状态 | 实际结果与证据 |
+|---|---|---|
+| 干净依赖安装与环境配置 | PASS | 新venv执行README官方PyPI安装命令成功；npm安装39包，`pip check`无缺失。`.env.example`能解析为bailian；新配置0600、Key只在后端。环境复制命令在新文件/已有文件两种情况下均成功且不覆盖原配置；见`final-clean-install-*`、`final-clean-demo-assets.json` |
+| README原默认pip安装 | FAIL | 本机已有清华源不能取得setuptools构建依赖；原日志`final-clean-install-backend-first-fail.log`保留。README已改为命令级官方PyPI地址，未改全局pip配置。macOS `cp -n`跳过已有文件返回1，已改为显式条件复制并实际复验 |
+| 前后端重新启动 | PASS | 新Vite进程HTML/module/API代理均200；新Web API数据目录独立。PC实际执行`bash scripts/start-desktop.sh --workspace ... --port 18006`，不是只调用uvicorn替代启动器；PID依次19469/19948/19965/19974，每次捕获新入口口令并由真实Chrome打开。另以README `--runner-ssh root@111.229.226.186`启动独立PC、读取新目录且Runner=ISOLATED；该专项不调用模型 |
+| 全部后端测试 | PASS | 新venv实际执行`.venv/bin/python scripts/verify_stage06.py root@111.229.226.186`：**218 passed，0失败/错误/跳过，256.54秒**，其中176控制流/Provider等受控测试、42真实容器测试。含Manager被杀后的孤儿清理；没有运行或skip成假PASS |
+| 前端与必要专项 | PASS | `npm --prefix frontend run build`：tsc/Vite 1581模块；ruff PASS。启动/缺Key/恢复/SSE探针PASS，**显式Mock LLM**；Chrome/WebKit共22项真实React控制流PASS，**HTTP后端夹具**，不当作真实模型或Runner证据 |
+| 新工作区真实备课 | PASS | 新目录`/private/tmp/yunyun-final-teacher-5vr6egq9`，A班初中，会话`332f9c0e198b424eb71c7dab9191a6da`。README普通备课请求完成5次真实qwen3.8-max请求、5程序17用例。该轮采用规则建议稿，不冒充额外自由改写；第19节自由改写证据保留。审核动作全部是自动化合成操作 |
+| 对抗、拒绝、回退、重启 | PASS | PC真实`while True: pass`产生TIMEOUT（n=0虽实际/期望同为空，仍因2秒限额失败）；接受禁用，package/delivery均409。恢复原代码、同一冻结规格重测通过。教学项目拒绝/接受、Diff拒绝不写、接受后落盘，待审批/已提交/覆盖后三次SIGKILL恢复；已有formal.md覆盖拒绝不变、接受匹配、重启不重复写，历史回退先拒绝后确认恢复原字节 |
+| Web干净会话及导出 | PASS | 本地Web B会话`437d08c2fd2d495faaef1623a42e9238`独立完成18用例与CSV/失败阻断/审批/ZIP。该Web子场景来自首批运行，后续PC失败未被改写成整批PASS。公网冷启动后新Chrome B会话`2d9dcfe178ff47b6b1a15513894c260c`为18用例；新WebKit大学会话`6fa5957700084fceb2ac0438ceb17314`为16用例。两者cookie隔离/越界403/刷新恢复/导出/JS错误检查均通过 |
+| 导出文件与PC真实落盘 | PASS | 4个新包各15文件/5 Python/5独立真实报告，分别18/17/16/18用例；逐一检查JSON/Markdown、45分钟、三档评分100、ZIP CRC、receipt、manifest、代码/规格ID与Hash/验证指纹及逐case实际输出。PC14个正式文件与ZIP逐字节Hash一致、权限0600；不是只检查文件名或HTTP200 |
+| 公网应用冷启动 | PASS | 先确认无活跃任务/候选，停API并作0600 SQLite备份，再重启Manager和API。PID由874471/453315变为973135/973079，启动时间均改变；原数据计数、配置内容不变。25模块与本地源码、3静态文件与新构建Hash一致；bailian/mock=false/ISOLATED。HTTPS验证IP证书有效至2026-11-05 14:07:48北京时间。未重新发布或替换镜像/配置 |
+| Git与产物敏感信息扫描 | PASS | 当前101个候选文件、暂存区、209个本地可达历史blob、前端产物未发现实际模型Key或高置信私钥/API Key模式；`.env`、`.runtime`、依赖目录被忽略，Docker上下文排除.env/runtime。复制运行证据前另检查真实Key，排除浏览器鉴权状态；不将此结果延伸为远端所有历史都已扫描 |
+| 原工作目录.env权限 | FAIL | 原配置权限为0644；按不擅改原配置的仓库规则保留，提交/换机前人工`chmod 600 .env`。本次新配置为0600，临时口令/配置在测试结束后清理；这项不能被Git扫描PASS覆盖 |
+| 演示资料 | PASS | 7个合成种子齐全，A的5未交/3死循环交集未知、B的0/0/8数据正确，初中/大学各2示例3练习结构可读；种子代码仍NOT_TESTED，正式包的PASS另有真实报告。一页PDF实际1页；README/环境示例/Prompt纠错材料及4分50秒脚本齐全。视频不包含在此PASS内 |
+| 视频、现场机、专业教师 | NOT_TESTED | 无成片/上传链接；用户明确现场会换机器。真实教师对教学适配与教育正确性的专业审核未做，合成点击不替代教师。B4/B5/C4/D4、C1/E4的相应缺口保留，E5完整交付仍FAIL |
+| 外部Git访问/最终提交 | NOT_TESTED | 远端地址已配置，但本次无交互鉴权探针仍因需用户名失败；不能确认面试方可访问。工作区改动未提交/推送，由用户检查最终diff与访问权限 |
+
+失败与恢复分开记录：首轮PC真实模型只复述“现场核验标记”并自行暂停，未生成教案，**FAIL**；后续两轮分别遇PROVIDER_UNAVAILABLE、PROVIDER_TIMEOUT，**FAIL**，超时轮虽已有5份PASS报告仍未作为整轮通过。第四轮PC备课/超时阻断已成功，但扩展探针漏带本机口令先得403；第五轮探针无SO_REUSEADDR导致TIME_WAIT端口预检误报，清理等待也超时。两项均为**验收驱动FAIL**，修正探针而非产品权限/隔离，清理自建残留后重跑；第六轮PC完整流程才为PASS。没有删除失败记录、放宽冻结用例、切换Mock或把复杂标记请求的失败改成通过。模型对资料误读及网络依赖仍是实际演示风险。
+
+本轮仅修订README安装/鉴权/保留配置步骤、过期作战包入口、使用失败说明及验收记录。未修改原.env内容/权限、锁文件、CI、业务源码；未Git提交或推送。空白VPS首次部署、原生选目录、Windows、Firefox、第三网络、未来证书真实续期及部署切回演练均NOT_TESTED。公网保持运行；自建本地服务/临时Manager/候选已清理。
+
+证据：[完整JUnit](../.runtime/final-clean-real-tests.xml)、[源码与真实Runner](../.runtime/final-clean-backend-summary.json)、[依赖/Hash总核对](../.runtime/final-clean-evidence-index.json)、[PC主线](../.runtime/final-clean-browser.json)、[CLI四次启动](../.runtime/final-clean-apps-live-model.json)、[SSH启动](../.runtime/final-clean-ssh-startup.json)、[公网双场景](../.runtime/final-public-browser.json)、[公网冷启动](../.runtime/final-clean-public-restart.json)、[四包独立核对](../.runtime/final-clean-package-audit.json)、[敏感扫描](../.runtime/final-clean-sensitive-audit.json)、[22项界面夹具](../.runtime/final-clean-ui-control.json)、[启动Mock探针](../.runtime/final-clean-startup-smoke.log)、[演示资料/环境命令](../.runtime/final-clean-demo-assets.json)。早期失败保留在`final-clean-first/second/third/fourth/fifth-*`；运行证据在忽略目录，换机需另行保留合成产物或重新生成。
+
+## 21. 授权本地Git提交（2026-10-30）
+
+用户明确要求“git提交掉”。阶段06修复、模型预算移除、对应回归/验收脚本及交付文档一起提交；密钥、运行数据库、日志、依赖和构建目录不纳入。提交前重新比对已验收源码/测试Hash及单页PDF，均未变化，沿用第20节实际测试结果，不声称本轮重跑全量。补充暂存区敏感检查与`git diff --cached --check`，本地提交结果以`git log -1`为准。
+
+本地提交PASS；未执行push，远端最终同步及面试方访问仍NOT_TESTED。第20节“未提交”是当时检查结束状态，本节记录后续授权；视频、真实教师与现场机器缺口未改变，E5仍FAIL。

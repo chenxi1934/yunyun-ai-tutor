@@ -90,7 +90,7 @@ async def test_failed_code_stays_failed_despite_model_claim(setup_agent):
     assert not agent.verification.current_pass(store.find('drafts')[0])
 
 
-async def test_repeat_failed_hash_rejected_and_repair_budget_persists(setup_agent):
+async def test_repeat_failed_hash_rejected_and_repair_count_persists(setup_agent):
     agent, store, session, _ = setup_agent(ScriptedProvider())
     path = 'sum.py'
     from app.domain import sha

@@ -17,7 +17,7 @@ class ScriptedProvider:
         self.responses = list(responses)
         self.requests = []
 
-    async def complete(self, messages, tools, max_tokens):
+    async def complete(self, messages, tools):
         self.requests.append(messages)
         value = self.responses.pop(0)
         if isinstance(value, Exception):
