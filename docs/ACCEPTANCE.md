@@ -630,3 +630,21 @@ UAT-004/005 为体验优化，UAT-006 为实际复现的 Diff 数据格式 Bug�
 证据（本机Git忽略）：`.runtime/uat-regression.xml`、`.runtime/uat-deploy.json`、`.runtime/uat-deploy-source.json`、`.runtime/uat-deploy-build.log`、`.runtime/uat-live-verification.json`。服务器备份位于`/opt/yunyun-tutor/releases/uat-20261030031906-47c92d696d/`。全部合成验证数据在候选容器临时目录内清理；公网核验仅GET，不新增生产会话，付费模型调用为0。
 
 当前状态：UAT-001～013代码已部署，待用户线上确认；Git仅本地提交，未推送。本节发布后补记只涉及文档，线上应用源码仍对应功能提交60606c9；不改变之前失败记录和完整面试验收未完成项。
+
+
+## 29. UAT-014～017：ABCD后续体验与文件冲突恢复（2026-10-30）
+
+| 检查 | 状态 | 实际证据与边界 |
+|---|---|---|
+| 审阅与单班级设置 | PASS，静态组件 | 实际工作区SSR确认标题/工具条同一头部；App SSR确认无A/B和观察计数，单班级与输入/上传/模板保留；真实视觉待确认 |
+| 文件冲突与新草稿 | PASS | 新增10项TestClient接口测试，覆盖修改/出现/删除、原文已一致、显式生成新稿、文件再次变化、旧候选不覆盖新候选、会话归属/符号链接/教案绑定、删除意图。审批/正式写入仍独立，未制造PASS |
+| 执行记录 | PASS，SSR范围 | 120条记录保留，标题在可键盘进入的滚动区域之外；空状态、失败信息和HTML转义通过。ResizeObserver与实际滚动/焦点仍NOT_TESTED |
+| 后端相关回归 | PASS | 下列pytest定向225项，11.54秒；`.runtime/uat-followup-regression.xml`。显式Mock/ScriptedProvider、真实临时文件/SQLite，不作为模型或Runner执行证据 |
+| 前端及构建 | PASS | `node --test --test-reporter=dot frontend/tests/*.test.mjs`：70项；`npm --prefix frontend run build`：TypeScript/Vite1847模块；改动Ruff、两份浏览器脚本语法、Git diff检查通过 |
+| 发布与用户确认 | 待本次发布 | 已明确授权提交与部署；需要前后端一起更新，无新依赖/锁文件/迁移或配置修改；真实Runner与公网结果另记，浏览器及教师专业审核仍NOT_TESTED |
+
+```bash
+.venv/bin/python -m pytest backend/tests/unit/test_agent_loop.py backend/tests/unit/test_policy.py backend/tests/unit/test_tool_timeouts.py backend/tests/unit/test_verification_policy.py backend/tests/unit/test_diffs.py backend/tests/unit/test_education.py backend/tests/unit/test_uat_workflow.py backend/tests/integration/test_api.py backend/tests/integration/test_delivery.py backend/tests/integration/test_stage05_review.py backend/tests/integration/test_session_resume.py backend/tests/integration/test_education_api.py backend/tests/integration/test_uat_api.py backend/tests/integration/test_draft_conflicts.py -q --tb=short -o junit_family=legacy --junitxml=.runtime/uat-followup-regression.xml
+```
+
+新恢复接口是教师操作入口，不增加模型工具。首条教师需求只在明确点击后完整回填，用户继续编辑后手动发送；普通文本文件冲突可直接生成新稿。真实文件校验、Python重新测试、教案稳定绑定、逐项审批及正式写入确认保留。用户手动步骤和原因见UAT-014～017。历史UAT-001～013发布证据保持原状。

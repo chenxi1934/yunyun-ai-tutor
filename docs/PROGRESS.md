@@ -638,3 +638,10 @@ Firefox在本机macOS图形子进程启动失败（sandbox extension / framebuff
 停机备份后切换，生产全部SQLite逻辑记录Hash一致，19会话/15任务/23提交/75条usage不变，334个原工作区文件Hash一致；保留备份和旧API回退容器。公网HTTPS证书校验、健康状态、百炼qwen3.8-max非Mock/Runner ISOLATED、25个实际导入模块和index/JS/CSS三份静态资源Hash均PASS；新CSV/JSON模板公开下载PASS。线上只读核验未创建生产会话，未进行浏览器或真实模型生成验收，未演练生产切回。
 
 证据：`.runtime/uat-regression.xml`、`uat-deploy.json`、`uat-deploy-source.json`、`uat-deploy-build.log`、`uat-live-verification.json`（均Git忽略，不含凭据）；具体边界见ACCEPTANCE第28节。功能已部署，用户体验确认、教师专业审核仍待进行；本地Git提交未推送，发布后只补记文档不再重启服务。
+
+
+## 2026-10-30：反馈ABCD本地实现与验证（UAT-014～017）
+
+A将标题与状态/审阅操作放在同一行，标题左、控件右，统一24px/11px紧凑风格；B按用户补充收敛为一个会话的一份本班班情，移除A/B快捷填充和观察计数，保留输入/上传/模板和历史。C定位为旧文件基准冲突与内容已一致被混同，新增具体路径/最新Diff及后端生成新草稿入口，复用Registry验证权限、冻结规格与教案绑定；可完整回填首条教师需求，但不覆盖未发送文字、不自动发送。D为执行记录提供独立限高滚动和区域外标题，随实际对话区高度调整。
+
+后端定向225项PASS（11.54秒），前端70项纯函数/SSR PASS；TypeScript/Vite构建1847模块，改动Ruff/脚本语法/Git差异检查PASS。新增文件冲突接口专项10项，前置7项功能断言先失败后通过；没有弱化测试、改变系统/模型工具schema或生产配置。用户已明确授权四项完成后提交部署，准备沿用候选隔离验收、备份、切换和公网Hash核验流程。未启动本地服务/浏览器，本版本真实Runner与发布结果后记，浏览器交互和真实模型生成仍NOT_TESTED。

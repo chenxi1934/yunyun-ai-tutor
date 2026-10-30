@@ -18,8 +18,8 @@ after(async () => {
   else globalThis.location = previousLocation
 })
 
-async function load(name, bundle = false) {
-  const source = new URL(`../src/${name}.tsx`, import.meta.url)
+async function load(name, bundle = false, extension = 'tsx') {
+  const source = new URL(`../src/${name}.${extension}`, import.meta.url)
   const transformed = bundle ? await build({ entryPoints: [fileURLToPath(source)], bundle: true,
     write: false, format: 'esm', platform: 'node', packages: 'external', jsx: 'automatic' })
     : await transformWithEsbuild(await readFile(source, 'utf8'), fileURLToPath(source), {
@@ -34,6 +34,10 @@ const { default: ReviewActions } = await load('ReviewActions')
 const { default: DeliveryGuidance, deliveryState } = await load('DeliveryGuidance')
 const { default: WorkspaceFiles } = await load('WorkspaceFiles')
 const { default: EducationWorkspace } = await load('EducationWorkspace', true)
+const { default: App } = await load('App', true)
+const { default: FileDraftFeedback, readDraftConflict, originalPreparationRequest } = await load('FileDraftFeedback', true)
+const { default: ExecutionLog } = await load('ExecutionLog')
+const { api, ApiError } = await load('api', true, 'ts')
 const noop = () => {}
 const render = (Component, props) => renderToStaticMarkup(element(Component, props))
 
@@ -217,6 +221,9 @@ test('实际产物组件把状态与操作放在正文之前，按章节显示�
   const html = render(EducationWorkspace, { snapshot, pending: false, act: async () => true, fail: noop, onOpenFiles: noop })
   const start = html.indexOf('id="teaching-analysis-content"')
   const article = html.slice(start, html.indexOf('</article>', start))
+  const heading = article.slice(article.indexOf('<div class="item-heading">'), article.indexOf('</div></div>') + 12)
+  assert.match(heading, /<h5 class="item-title">content分析<\/h5>/)
+  assert.match(heading, /class="review-toolbar"/)
   assert.ok(article.indexOf('review-toolbar') < article.indexOf('合成章节内容'))
   assert.match(article, /已拒绝，待修改/)
   assert.match(article, /继续修改/)
@@ -236,4 +243,111 @@ test('交付被课程适配提示阻塞时，正文显示项目名称与原因',
   const html = render(EducationWorkspace, { snapshot, pending: false, act: async () => true, fail: noop, onOpenFiles: noop })
   assert.match(html, /顺序计数：当前学段不包含嵌套循环，请修改。/)
   assert.doesNotMatch(html, /&quot;item_id&quot;|&quot;reason&quot;/)
+})
+
+test('教学设置去掉A/B快捷填充，保留上传、文字和模板入口', () => {
+  const html = render(App, {})
+  assert.doesNotMatch(html, /使用A班|使用B班/)
+  assert.doesNotMatch(html, /条班情观察|class="profile-count"/)
+  assert.match(html, /本会话只为一个班级备课/)
+  assert.match(html, /下载 CSV 示例/)
+  assert.match(html, /下载 JSON 示例/)
+  assert.match(html, /上传班情/)
+  assert.match(html, /汇总班情（可选）/)
+})
+
+function conflictFixture(reason = 'modified') {
+  const draft = { id: 'file-draft', path: 'lesson.md', operation: 'write', content: '候选教案' }
+  const details = { kind: 'FILE_DRAFT_CONFLICT', reason, draft_id: draft.id,
+    current_file: { path: draft.path, content: '当前教案', hash: 'current-hash' },
+    diff: '--- lesson.md\n+++ lesson.md\n@@ -1 +1 @@\n-当前教案\n+候选教案\n' }
+  const error = new ApiError('文件“lesson.md”：正式文件版本不同。', reason === 'already_current' ? 'DRAFT_ALREADY_CURRENT' : 'REVISION_CONFLICT', 409, details)
+  return { draft, error, conflict: readDraftConflict(error, draft) }
+}
+const feedbackProps = { busy: false, belongsToLesson: false, continuationBlocked: false, onRefresh: noop, onContinue: noop, onLesson: noop }
+
+test('客户端保留后端错误编码和差异详情，不丢失文件定位', async () => {
+  const oldFetch = globalThis.fetch, oldStorage = globalThis.sessionStorage
+  const { draft, error } = conflictFixture()
+  globalThis.sessionStorage = { getItem: () => null }
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: error.code, message: error.message, details: error.details } }), { status: 409 })
+  try {
+    await assert.rejects(api('/sessions/test/publish-draft', { draft_id: draft.id }), failure => {
+      assert.equal(failure.code, 'REVISION_CONFLICT')
+      assert.equal(failure.status, 409)
+      assert.equal(readDraftConflict(failure, draft).current_file.content, '当前教案')
+      return true
+    })
+  } finally {
+    globalThis.fetch = oldFetch
+    if (oldStorage === undefined) delete globalThis.sessionStorage
+    else globalThis.sessionStorage = oldStorage
+  }
+})
+
+test('普通会话冲突与其他草稿错误不冒充当前文件冲突', () => {
+  const { draft, error } = conflictFixture()
+  assert.equal(readDraftConflict(new ApiError('会话已变化', 'REVISION_CONFLICT', 409), draft), undefined)
+  assert.equal(readDraftConflict(error, { ...draft, id: 'other' }), undefined)
+  assert.equal(readDraftConflict(error, { ...draft, path: 'other.md' }), undefined)
+  assert.equal(readDraftConflict(new ApiError('故障', 'SERVER_ERROR', 500, error.details), draft), undefined)
+})
+
+test('文件冲突提供当前差异和生成新草稿入口，不要求重发整份需求', () => {
+  const value = conflictFixture()
+  const html = render(FileDraftFeedback, { ...feedbackProps, ...value, originalRequest: '合成原需求，仅回填时使用' })
+  assert.match(html, /lesson\.md/)
+  assert.match(html, /查看当前文件与草稿的差异/)
+  assert.match(html, /基于当前文件重新生成草稿/)
+  assert.match(html, /此操作仅保存草稿/)
+  assert.match(html, /Python 新草稿需重新验证/)
+  assert.match(html, /带入原备课需求/)
+  assert.doesNotMatch(html, /合成原需求，仅回填时使用/)
+})
+
+test('文件已符合候选内容时为状态提示，不重复生成或声称新写入成功', () => {
+  const value = conflictFixture('already_current')
+  const html = render(FileDraftFeedback, { ...feedbackProps, ...value })
+  assert.match(html, /role="status"/)
+  assert.match(html, /当前文件已符合草稿目标/)
+  assert.doesNotMatch(html, /基于当前文件重新生成|role="alert"|写入成功/)
+})
+
+test('教案关联代码引导回教学项目，不能通过独立文件重建绕过绑定', () => {
+  const html = render(FileDraftFeedback, { ...feedbackProps, ...conflictFixture(), belongsToLesson: true })
+  assert.match(html, /返回备课产物/)
+  assert.match(html, /完成逐项审阅/)
+  assert.doesNotMatch(html, /基于当前文件重新生成草稿/)
+})
+
+test('删除草稿保持删除意图，已有输入或编辑时不能覆盖回填', () => {
+  const value = conflictFixture()
+  const html = render(FileDraftFeedback, { ...feedbackProps, ...value, draft: { ...value.draft, operation: 'delete' }, originalRequest: '原需求', continuationBlocked: true })
+  assert.match(html, /基于当前文件重新生成删除草稿/)
+  assert.match(html, /<button type="button" disabled="">带入原备课需求/)
+  assert.match(html, /未发送的内容或当前文件编辑/)
+})
+
+test('原始备课需求回填保持完整原文，不选择模型文字或截断长需求', () => {
+  const original = '  全班40人，请备课。\n' + '补充教学条件。'.repeat(1200)
+  assert.equal(originalPreparationRequest([{ role: 'assistant', content: '模型文字' }, { role: 'user', content: ' ' }, { role: 'user', content: original }, { role: 'user', content: '后续修改' }]), original)
+  assert.equal(originalPreparationRequest([{ role: 'assistant', content: '模型文字' }]), undefined)
+})
+
+test('执行记录标题位于滚动区域外，长记录不截断且支持键盘进入', () => {
+  const events = Array.from({ length: 120 }, (_, index) => ({ event_id: index + 1, type: 'tool.completed', timestamp: '2026-10-30T03:30:00Z', payload: { name: 'read_file' } }))
+  const html = render(ExecutionLog, { events, labels: { 'tool.completed': '操作已完成' }, tools: { read_file: '读取文件' } })
+  assert.match(html, /<details class="execution-log"><summary>查看执行记录（120）<\/summary><div class="execution-log-scroll"/)
+  assert.match(html, /role="region" aria-label="执行记录列表" tabindex="0"/)
+  assert.equal((html.match(/<li>/g) || []).length, 120)
+  assert.match(html, /操作已完成 · 读取文件/)
+  assert.doesNotMatch(html, /<details class="execution-log" open/)
+})
+
+test('执行记录保留空状态与失败追溯，错误内容安全转义', () => {
+  assert.match(render(ExecutionLog, { events: [], labels: {}, tools: {} }), /暂无执行记录/)
+  const html = render(ExecutionLog, { events: [{ event_id: 1, type: 'tool.failed', timestamp: '2026-10-30T03:30:00Z', payload: { result: { message: '<img src=x onerror=alert(1)>' } } }], labels: { 'tool.failed': '操作失败' }, tools: {} })
+  assert.match(html, /失败详情/)
+  assert.match(html, /&lt;img/)
+  assert.doesNotMatch(html, /<img/)
 })

@@ -4,8 +4,10 @@ import EducationWorkspace from './EducationWorkspace'
 import ChatMessage from './ChatMessage'
 import DiffView from './DiffView'
 import WorkspaceFiles from './WorkspaceFiles'
+import FileDraftFeedback, { readDraftConflict, originalPreparationRequest, type FileDraftConflict } from './FileDraftFeedback'
+import ExecutionLog from './ExecutionLog'
 import VerificationDiagnostic, { Report } from './VerificationDiagnostic'
-import { api, uploadProfile, type Recovery, type AgentEvent, type Runtime, type Session, type Snapshot } from './api'
+import { api, uploadProfile, type Draft, type Recovery, type AgentEvent, type Runtime, type Session, type Snapshot } from './api'
 
 const statuses: Record<string, string> = {
   READY: '准备中', RUNNING: '正在处理', WAITING_APPROVAL: '等待教师审核', COMPLETED: '本轮已结束',
@@ -52,6 +54,9 @@ export default function App() {
   const [recovery, setRecovery] = useState<Recovery>()
   const [panel, setPanel] = useState('备课产物')
   const [fileEdit, setFileEdit] = useState<string>()
+  const [draftConflict, setDraftConflict] = useState<FileDraftConflict>()
+  const [draftNotice, setDraftNotice] = useState<{ id: string; text: string }>()
+  const [requestPrefilled, setRequestPrefilled] = useState(false)
   const [newPath, setNewPath] = useState('')
   const [stage, setStage] = useState('初中')
   const [grade, setGrade] = useState('初二')
@@ -78,6 +83,7 @@ export default function App() {
     setSid(id); setSnapshot(undefined); setEvents([]); setFiles([]); setFile(undefined); setFileEdit(undefined)
     setRecovery(undefined); setLoadingFile(false); setStreamError(false); setPending(false); setActivity(''); setError('')
     setProfileFile(undefined); setUploadError(''); setProfile(''); setProfileFormat('text'); setProfileMode('supplement')
+    setDraftConflict(undefined); setDraftNotice(undefined); setRequestPrefilled(false)
     if (profileInputRef.current) {
       profileInputRef.current.value = ''
     }
@@ -214,7 +220,7 @@ export default function App() {
       await api(`/sessions/${session.id}/messages`, { content: text,
         expected_revision: session.revision, idempotency_key: crypto.randomUUID() })
       if (!isCurrent(scope)) return
-      setText(''); setShowWorkspace(true); await refresh(session.id, scope.epoch)
+      setText(''); setRequestPrefilled(false); setShowWorkspace(true); await refresh(session.id, scope.epoch)
     } catch (e) {
       if (isCurrent(scope)) {
         setError((e as Error).message)
@@ -228,7 +234,7 @@ export default function App() {
     const scope = { id: sid, epoch: generation.current }, fileEpoch = fileGeneration.current
     if (!isCurrent(scope)) return false
     setPending(true); setError('')
-    setActivity(path.endsWith('/verify') ? '正在执行真实代码测试…' : path.endsWith('/recovery') ? '正在对账恢复…' : path.endsWith('/delivery') || path.endsWith('/publish-draft') ? '正在生成文件Diff…' : path.endsWith('/decision') ? '正在处理文件审批…' : path.endsWith('/reviews') ? '正在保存审核结果…' : '正在保存修改…')
+    setActivity(path.endsWith('/verify') ? '正在执行真实代码测试…' : path.endsWith('/recovery') ? '正在对账恢复…' : path.endsWith('/delivery') || path.endsWith('/publish-draft') ? '正在生成文件Diff…' : path.endsWith('/decision') ? '正在处理文件审批…' : path.endsWith('/reviews') ? '正在保存审核结果…' : path.endsWith('/refresh-draft') ? '正在基于当前文件生成新草稿…' : '正在保存修改…')
     try {
       if (operation) await operation()
       else await api(path, body, method)
@@ -260,6 +266,39 @@ export default function App() {
       if (isCurrent(scope)) setRecovery(data.recovery)
     } catch (e) { if (isCurrent(scope)) setError((e as Error).message) }
     finally { if (isCurrent(scope)) setPending(false) }
+  }
+
+  async function fileDraftAction(draft: Draft, refreshBase = false) {
+    if (!snapshot || !isCurrent(renderScope) || blocked || fileEdit !== undefined) return
+    const scope = currentScope()
+    const conflict = draftConflict?.draft_id === draft.id ? draftConflict : undefined
+    if (refreshBase && !conflict) return
+    const path = `/sessions/${sid}/${refreshBase ? 'refresh-draft' : 'publish-draft'}`
+    const body = { draft_id: draft.id, expected_revision: snapshot.session.revision,
+      ...(refreshBase ? { current_hash: conflict!.current_file.hash } : {}) }
+    setDraftConflict(undefined); setDraftNotice(undefined)
+    await action(path, undefined, undefined, async () => {
+      try {
+        const response = await api<{ draft_id?: string }>(path, body)
+        if (isCurrent(scope) && response.draft_id) setDraftNotice({ id: response.draft_id,
+          text: draft.operation === 'delete' ? '新的删除草稿已保存，请重新审核差异并确认。' : /\.py$/i.test(draft.path) ? '新草稿已保存。Python代码需重新验证后才能审核，可带入原需求请助教继续处理。' : '新草稿已保存，请重新审核差异并确认正式写入。' })
+      } catch (error) {
+        const detail = readDraftConflict(error, draft)
+        if (isCurrent(scope) && detail) {
+          setDraftConflict(detail)
+          if (detail.reason === 'already_current') return
+        }
+        throw error
+      }
+    })
+  }
+
+  function prefillOriginalRequest() {
+    if (!snapshot || !isCurrent(renderScope) || blocked || text.trim() || fileEdit !== undefined) return
+    const original = originalPreparationRequest(snapshot.messages)
+    if (!original) return
+    setText(original); setRequestPrefilled(true)
+    messageRef.current?.focus()
   }
 
   return <div className="app-shell">
@@ -301,11 +340,7 @@ export default function App() {
           {run.error && <p className="alert" role="alert">{run.error.message}<small>{run.error.code}</small></p>}
           {['INTERRUPTED', 'FAILED'].includes(run.status) && <button disabled={pending || unresolved} onClick={() => void action(`/sessions/${sid}/resume`, { expected_revision: snapshot!.session.revision })}><RefreshCw size={14} aria-hidden="true" />继续当前任务</button>}
           {['READY', 'RUNNING', 'WAITING_APPROVAL', 'INTERRUPTED', 'FAILED'].includes(run.status) && <button className="subtle" disabled={pending} onClick={() => void action(`/runs/${run.id}/cancel`, {})}><Square size={13} aria-hidden="true" />停止任务</button>}
-          <details><summary>查看执行记录（{events.length}）</summary><ol className="events">{events.map(ev => <li key={ev.event_id}>
-            <span>{eventNames[ev.type] || ev.type}{typeof ev.payload.name === 'string' ? ` · ${toolNames[ev.payload.name] || ev.payload.name}` : ''}</span>
-            <time>{new Date(ev.timestamp).toLocaleTimeString('zh-CN')}</time>
-            {ev.type === 'tool.failed' && <details><summary>失败详情</summary><pre>{JSON.stringify(ev.payload.result, null, 2)}</pre></details>}
-          </li>)}</ol></details>
+          <ExecutionLog events={events} labels={eventNames} tools={toolNames} />
           {streamError && <p className="muted" role="status">进度连接已断开，正在重连。<button className="subtle" onClick={() => sid && void refresh(sid, renderScope.epoch).catch(e => { if(isCurrent(renderScope)) setError(e.message) })}>刷新状态</button></p>}
         </section>}
       </div>
@@ -313,7 +348,6 @@ export default function App() {
         <details key={sid || 'new'} className="profile-input composer-settings" open={!sid}>
           <summary>
             <span className="context-summary" title={contextSummary}>{contextSummary}</span>
-            {currentProfile && <span className="profile-count">{currentProfile.facts.length} 条班情观察</span>}
             {uploadError && <span className="failure">班情待修正</span>}
             <span className="settings-label">教学设置与班情</span><ChevronDown size={14} aria-hidden="true" />
           </summary>
@@ -323,14 +357,14 @@ export default function App() {
               <label>年级<input name="grade" autoComplete="off" value={grade} maxLength={30} onChange={e => setGrade(e.target.value)} /></label>
               <label>主题<input name="topic" autoComplete="off" value={topic} maxLength={100} onChange={e => setTopic(e.target.value)} /></label>
             </div></fieldset>
-            <p className="muted">可上传或补充班情，也可直接写进下方需求；发送时会一并处理。请只提供汇总数据，不填姓名、学号。</p>
-            {currentProfile && <div className="current-profile"><strong>当前已保存班情</strong><p>{currentProfile.class_size ? `班级共 ${currentProfile.class_size} 人；` : '班级人数未知；'}{currentProfile.facts.map(fact => fact.observation).join('；') || '暂无量化观察，保留未知'}</p>{!!currentProfile.prior_knowledge?.length && <p>已知先修：{currentProfile.prior_knowledge.join('、')}</p>}</div>}
+            <p className="muted">本会话只为一个班级备课，补充和更正都更新这一份本班情况。为其他班级备课请新建会话。</p>
+            <p className="muted">可上传、填写班情，或直接写进下方需求，发送时一并处理。请只提供汇总数据，不填姓名、学号。</p>
+            {currentProfile && <div className="current-profile"><strong>本班已保存班情</strong><p>{currentProfile.class_size ? `班级共 ${currentProfile.class_size} 人；` : '班级人数未知；'}{currentProfile.facts.map(fact => fact.observation).join('；') || '暂无量化观察，保留未知'}{currentProfile.prior_knowledge?.length ? `；已知先修：${currentProfile.prior_knowledge.join('、')}` : ''}</p></div>}
             <div className="profile-templates"><a href="/api/class-profile-templates/csv" download>下载 CSV 示例</a><a href="/api/class-profile-templates/json" download>下载 JSON 示例</a><span>合成示例，可修改人数后上传；未提供的观察保持未知。</span></div>
             <fieldset className="profile-fields" disabled={blocked}>
             <label>手动导入方式<select value={profileMode} onChange={e => setProfileMode(e.target.value as 'replace' | 'supplement')}><option value="supplement">补充当前班情，保留已有观察</option><option value="replace">整体替换班情，用于更正资料</option></select></label>
             <p className="muted">{profileMode === 'supplement' ? '同类人数不一致时会提示核实，不覆盖、不累加。' : '将用本次资料整体替换当前班情；未包含的观察会变为未知。旧版本仍保留。'}</p>
             <p className="muted">需求里的明确班情按补充处理；更正人数时，请在这里填写资料并选择整体替换。</p>
-            <div className="actions"><button type="button" disabled={blocked} onClick={() => setProfileInput('班级共40人，刚学完条件语句；5人未交、3人while死循环。', 'text')}>使用A班</button><button type="button" disabled={blocked} onClick={() => setProfileInput('type,count,class_size\nnot_submitted,0,40\ninfinite_loop,0,40\nboundary_error,8,40\n', 'csv')}>使用B班</button></div>
             <label>班情格式<select value={profileFormat} onChange={e => setProfileInput(profile, e.target.value)}><option value="text">文字</option><option value="json">JSON</option><option value="csv">CSV</option></select></label>
           <label>汇总班情（可选）<textarea aria-label="汇总班情" value={profile} placeholder="例如：全班40人，5人未交，3人while死循环，刚学完条件语句。也可直接写在备课需求中…" maxLength={20000} onChange={e => setProfileInput(e.target.value, profileFormat)} rows={2}/></label>
             <label>上传班情（JSON/CSV，1 MiB以内）<input ref={profileInputRef} type="file" name="class-profile-file" accept=".json,.csv" aria-invalid={!!uploadError} aria-describedby={uploadError ? 'upload-error' : undefined} disabled={blocked} onChange={e => {const f=e.target.files?.[0]; if(f) void readProfile(f)}}/></label>
@@ -339,7 +373,8 @@ export default function App() {
             </fieldset>
           </div>
         </details>
-        <label htmlFor="request">备课需求</label><textarea ref={messageRef} id="request" name="request" autoComplete="off" value={text} maxLength={12000} onChange={e => setText(e.target.value)}
+        {requestPrefilled && <p className="request-prefill" role="status">原备课需求已带入，尚未发送。请补充要处理的文件及修改要求，再点击发送需求。</p>}
+        <label htmlFor="request">备课需求</label><textarea ref={messageRef} id="request" name="request" autoComplete="off" value={text} maxLength={12000} onChange={e => { setText(e.target.value); setRequestPrefilled(false) }}
           placeholder={sid ? '补充教学要求或明确班情，例如：另有8人出现边界错误，请加强边界练习…' : '全班40人，5人未交、3人while死循环，刚学完条件语句。请备一节45分钟《循环结构》，包含示例与分层练习并真实验证代码…'} rows={sid ? 1 : 3} />
         <div className="composer-footer"><small>{sid ? '会话已保存，可从历史继续' : '将创建独立的备课会话'}</small><button className="primary" type="submit" disabled={!connected || blocked}><ArrowUp size={16} aria-hidden="true" />{pending ? '处理中…' : '发送需求'}</button></div>
       </form>
@@ -361,11 +396,12 @@ export default function App() {
         <label>新文件相对路径<input value={newPath} placeholder="例如：notes/lesson.md" onChange={e => setNewPath(e.target.value)}/></label><button disabled={blocked || !newPath.trim()} onClick={() => {fileGeneration.current += 1; setFile({path:newPath,content:'',hash:null});setFileEdit('')}}>新建文件草稿</button>
         {fileEdit !== undefined && file && <section className="item-editor"><label>文件内容<textarea spellCheck={false} name="file-content" rows={8} value={fileEdit} onChange={e => setFileEdit(e.target.value)}/></label><button disabled={blocked} onClick={() => void action(`/sessions/${sid}/drafts`,{path:file.path,content:fileEdit,base_hash:file.hash,operation:'write',expected_revision:snapshot!.session.revision}).then(ok => {if(ok)setFileEdit(undefined)})}>保存草稿，待审批</button><button onClick={() => setFileEdit(undefined)}>取消编辑</button></section>}
         <h3>修改草稿</h3>{!snapshot?.drafts.length && <p className="muted">助教提出的修改会显示在这里。</p>}
-        {snapshot?.drafts.filter(d => snapshot.drafts.filter(v => v.path === d.path).at(-1)?.id === d.id).map(d => <section className="draft" key={d.id}><strong>{d.path}</strong><p className="muted">版本 {d.revision} · {d.operation === 'delete' ? '待删除' : '草稿'} · {d.operation === 'delete' ? '按原文件Hash审批' : verificationLabels[d.verification_status] || '未测试'}{d.mock ? ' · MOCK_LLM' : ''}</p><details><summary>查看文件差异</summary><DiffView diff={d.diff} filePath={d.path} fromLabel="正式文件" toLabel={d.operation === 'delete' ? '删除后' : '当前草稿'} /></details>
+        {snapshot?.drafts.filter(d => snapshot.drafts.filter(v => v.path === d.path).at(-1)?.id === d.id).map(d => <section className="draft" key={d.id}><strong>{d.path}</strong><p className="muted">版本 {d.revision} · {d.operation === 'delete' ? '待删除' : '草稿'} · {d.operation === 'delete' ? '按原文件Hash审批' : verificationLabels[d.verification_status] || '未测试'}{d.mock ? ' · MOCK_LLM' : ''}</p><details><summary>草稿生成时的文件差异</summary><DiffView diff={d.diff} filePath={d.path} fromLabel="生成时的正式文件" toLabel={d.operation === 'delete' ? '删除后' : '当前草稿'} /></details>
           {d.repair_diff && <details><summary>与上一版代码对比</summary><DiffView diff={d.repair_diff} filePath={d.path} fromLabel="上一版代码" toLabel="当前草稿" /></details>}
           {d.operation !== 'delete' && /\.py$/i.test(d.path) && <VerificationDiagnostic status={d.verification_status} report={snapshot.verification_reports.filter(r => r.draft_id === d.id).at(-1)} changed={!!d.repair_diff} />}
           {snapshot.verification_reports?.filter(r => r.draft_id === d.id).map(r => <Report report={r} key={r.id} />)}
-          <button disabled={blocked} onClick={() => void action(`/sessions/${sid}/publish-draft`, {draft_id:d.id,expected_revision:snapshot.session.revision})}>审核此文件变更</button>
+          <button disabled={blocked || fileEdit !== undefined} onClick={() => void fileDraftAction(d)}>{draftConflict?.draft_id === d.id && draftConflict.reason === 'already_current' ? '重新检查文件状态' : '审核此文件变更'}</button>
+          <FileDraftFeedback draft={d} conflict={draftConflict?.draft_id === d.id ? draftConflict : undefined} notice={draftNotice?.id === d.id ? draftNotice.text : undefined} busy={blocked || fileEdit !== undefined} belongsToLesson={snapshot.lessons.some(lesson => Object.values(lesson.items).some(item => item.draft_id === d.id))} originalRequest={originalPreparationRequest(snapshot.messages)} continuationBlocked={!!text.trim() || fileEdit !== undefined} onRefresh={() => void fileDraftAction(d, true)} onContinue={prefillOriginalRequest} onLesson={() => setPanel('备课产物')} />
         </section>)}
         </>}
         <div id="pending-file-approvals" tabIndex={-1}>{snapshot?.approvals.filter(a => a.status === 'PENDING').map(a => <section className="approval" key={a.id} aria-label="正式文件审批"><h3>确认正式文件变更</h3><p>接受将写入当前工作区；拒绝保持文件不变。</p>

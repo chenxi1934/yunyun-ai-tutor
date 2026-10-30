@@ -19,6 +19,13 @@ export interface Snapshot {
 }
 export interface Runtime { mode: string; provider: string; model: string; mock: boolean; key_configured: boolean; runner: string; workspace_name?: string }
 
+export class ApiError extends Error {
+  constructor(message: string, public code: string, public status: number, public details?: Record<string, unknown>) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 const fragment = new URLSearchParams(location.hash.slice(1))
 if (fragment.has('token')) {
   sessionStorage.setItem('yunyun_local_token', fragment.get('token')!)
@@ -32,7 +39,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     headers: { ...init.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   })
   const data = await response.json()
-  if (!response.ok) throw new Error(data.error?.message || `请求失败（${response.status}）`)
+  if (!response.ok) throw new ApiError(data.error?.message || `请求失败（${response.status}）`, data.error?.code || 'REQUEST_FAILED', response.status, data.error?.details)
   return data as T
 }
 

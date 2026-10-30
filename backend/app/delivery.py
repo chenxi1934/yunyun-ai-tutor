@@ -106,10 +106,60 @@ class DeliveryService:
         if draft['session_id'] != session['id']:
             raise AppError('NOT_FOUND', '草稿不属于当前会话。', 404)
         original = original if original is not None else self.agent.workspace(session).read(draft['path'], allow_missing=True)
+        if self._draft_matches(draft, original):
+            self._draft_conflict(draft, original)
         if original['hash'] != draft['base_hash']:
-            raise AppError('REVISION_CONFLICT', '正式文件已变化，请重新生成草稿。', 409)
+            self._draft_conflict(draft, original)
         return self.prepare(session, {draft['path']: None if draft['operation'] == 'delete' else draft['content']},
                             originals={draft['path']: original}, draft_id=did, draft_ids=[did], **metadata)
+
+    @staticmethod
+    def _draft_matches(draft, current):
+        return (current['hash'] is None if draft['operation'] == 'delete'
+                else current['hash'] == draft['content_hash'])
+
+    def _draft_conflict(self, draft, current, *, rechecked=False):
+        same = self._draft_matches(draft, current)
+        reason = ('already_current' if same else 'deleted' if current['hash'] is None
+                  else 'created' if draft['base_hash'] is None else 'modified')
+        explanation = {'already_current': '当前文件已符合这份草稿的目标，无需重复审核或写入。',
+                       'created': '生成草稿时文件尚不存在，现在已有正式文件。',
+                       'deleted': '生成草稿后，正式文件已被删除。',
+                       'modified': '正式文件已不同于生成草稿时的版本。'}[reason]
+        if rechecked and not same:
+            explanation = '当前文件与刚才查看的版本不同，请重新核对最新差异。'
+        message = f'文件“{draft["path"]}”：{explanation}'
+        if not same:
+            message += '旧差异不能继续审批；请核对当前差异，再基于当前文件生成新草稿。'
+        raise AppError('DRAFT_ALREADY_CURRENT' if same else 'REVISION_CONFLICT', message, 409,
+            details={'kind': 'FILE_DRAFT_CONFLICT', 'reason': reason, 'draft_id': draft['id'],
+                     'expected_hash': draft['base_hash'],
+                     'current_file': {key: current[key] for key in ('path', 'content', 'hash')},
+                     'diff': Registry._diff(draft['path'], current['content'],
+                                           '' if draft['operation'] == 'delete' else draft['content'])})
+
+    def refresh_draft(self, session, did, current_hash):
+        self.ensure_reconciled(session)
+        draft = self.store.get('drafts', did)
+        if draft['session_id'] != session['id']:
+            raise AppError('NOT_FOUND', '草稿不属于当前会话。', 404)
+        latest = [d for d in self.store.find('drafts', session['id']) if d['path'] == draft['path']][-1]
+        if latest['id'] != did:
+            raise AppError('STALE_DRAFT', '该文件已有更新的草稿，请刷新后处理最新版本。', 409)
+        ws = self.agent.workspace(session)
+        current = ws.read(draft['path'], allow_missing=True)
+        if current['hash'] != current_hash or self._draft_matches(draft, current):
+            self._draft_conflict(draft, current, rechecked=True)
+        call = {'id': uid(), 'run_id': None, 'session_id': session['id'], 'name': 'propose_patch',
+                'arguments': dumps({'path': draft['path'], 'content': draft['content'],
+                                    'operation': draft['operation'], 'base_hash': current_hash})}
+        response = self.agent.registry.execute(call, session, ws)
+        if not response['ok']:
+            error = response['error']
+            if error['code'] == 'REVISION_CONFLICT':
+                self._draft_conflict(draft, ws.read(draft['path'], allow_missing=True), rechecked=True)
+            raise AppError(error['code'], error['message'], 409, details=error.get('details'))
+        return response['data']
 
     def hydrate(self, session, approval):
         # 阶段02原生request_publish审批在接受时仍核对它保存的精确Hash。

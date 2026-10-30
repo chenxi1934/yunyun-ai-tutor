@@ -22,6 +22,10 @@ class DraftPublish(Revision):
     draft_id: str
 
 
+class DraftRefresh(DraftPublish):
+    current_hash: str | None
+
+
 class Reconcile(Revision):
     snapshot_hash: str = Field(min_length=64, max_length=64)
     decision: Literal['accept', 'reject', 'rollback']
@@ -96,6 +100,14 @@ def register_delivery(app, agent, session, result, execution_lock):
             approval = delivery.prepare_draft(value, body.draft_id)
             bump(value)
         return result(request, {'approval': approval})
+
+    @app.post('/api/sessions/{sid}/refresh-draft')
+    async def refresh_draft(request: Request, sid: str, body: DraftRefresh):
+        with store.tx():
+            value = mutation(request, sid, body.expected_revision)
+            draft = delivery.refresh_draft(value, body.draft_id, body.current_hash)
+            bump(value)
+        return result(request, draft)
 
     @app.post('/api/sessions/{sid}/lessons/{lid}/delivery')
     async def prepare_lesson(request: Request, sid: str, lid: str, body: Revision):

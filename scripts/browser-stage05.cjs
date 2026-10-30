@@ -31,10 +31,9 @@ async function scenario(browser, name, url, stage, className, pc=false) {
   await until(async()=>page.getByRole('button',{name:'发送需求',exact:true}).isEnabled(),'连接工作台',30000);
   await page.screenshot({path:path.join(evidence,`${stem}-${name}-welcome.png`),fullPage:true});
   await page.getByRole('combobox',{name:'学段',exact:true}).selectOption(stage);
-  if(!pc && className==='B') {
-    await page.locator('input[type=file]').setInputFiles(path.resolve('backend/seeds/core/class_B.csv'));
-    await until(async()=>await page.getByRole('combobox',{name:'班情格式',exact:true}).inputValue()==='csv','读取班情CSV');
-  } else await page.getByRole('button',{name:'使用'+className+'班',exact:true}).click();
+  const profileFormat=className==='B'?'csv':'json';
+  await page.locator('input[type=file]').setInputFiles(path.resolve(`backend/seeds/core/class_${className}.${profileFormat}`));
+  await until(async()=>await page.getByRole('combobox',{name:'班情格式',exact:true}).inputValue()===profileFormat,'读取合成班情');
   const request=process.env.YUNYUN_ACCEPT_REQUEST || '读取工作区班情与示例，依据已导入班情为本学段备一节45分钟《循环结构》。生成完整结构化教案、2个示例、基础进阶挑战各1题含参考解与评分点，以及有班情依据的错因预警。请真实验证所有示例与参考答案，失败仅修代码并重测；等待教师审核。教学文字务必与实际代码一致。';
   await page.getByRole('textbox',{name:'备课需求',exact:true}).fill(request);
   await responseClick(page,page.getByRole('button',{name:'发送需求',exact:true}),'/messages');
