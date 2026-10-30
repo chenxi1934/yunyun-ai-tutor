@@ -20,6 +20,36 @@ UNIVERSITY_NOTES = {
               'n=0/1时无候选，输出0。复杂度：最坏时间上界O(n²)，额外空间O(1)。',
 }
 
+TASK_LABELS = {'count': '顺序计数', 'sum': '累加求和', 'countdown': '循环倒计数',
+               'even_sum': '正偶数求和', 'multiples': '倍数筛选与去重',
+               'pairs': '整数对计数', 'divisors': '正约数计数', 'primes': '素数计数'}
+
+
+def lesson_overview(profile, university):
+    facts = '；'.join(f.observation for f in profile.facts) or '暂无已确认的量化观察，不能预设未交或出错人数'
+    size = f'班级共{profile.class_size}人' if profile.class_size else '班级人数未知，不计算比例'
+    prior = '、'.join(profile.prior_knowledge) or '先修掌握情况未确认，课前需诊断'
+    emphasis = ('循环不变量的初始化、保持与退出，终止性论证及时间/空间复杂度' if university else
+                '循环条件、循环体与变量更新的对应关系，以及range终点不包含的边界含义')
+    actions = '；'.join(s.action for s in strategies(profile))
+    return [
+        {'id': 'analysis-content', 'kind': 'content', 'title': '本课内容与学习路径',
+         'content': f'课程定位：以变量、输入输出和条件判断为基础，学习用重复执行解决计数、累加和筛选任务。\n'
+                    f'核心内容：{emphasis}。\n'
+                    '学习路径：先预测执行过程，再用追踪表解释变量变化，运行固定用例核对，最后迁移到分层练习。\n'
+                    '课堂资源：使用备课产物中的示例与分层题；教师按课堂需要准备零次/一次/正常输入的追踪表和出口反馈单。'},
+        {'id': 'analysis-learners', 'kind': 'learners', 'title': '本班依据与教学应对',
+         'content': f'已知班情：{size}；{facts}。\n先修依据：{prior}。\n'
+                    '判断边界：各类学生集合交集未知，人数不能相加；观察只能提示待诊断问题，不能证明能力或病因。\n'
+                    f'教学应对：{actions}\n'
+                    '课堂核实：先收集条件判断与变量更新的回答，再调整提示强度；缺失信息继续标为未知。'},
+        {'id': 'analysis-focus', 'kind': 'focus', 'title': '重点、难点与解决策略',
+         'content': f'教学重点：{emphasis}。\n'
+                    '教学难点：把每次条件判断与更新后的状态对应起来，解释为什么终止，以及零次/一次循环的差别。\n'
+                    '解决策略：教师示范一轮追踪，学生补齐后续状态；将退出条件和更新方向并列检查，用零次/一次输入核对边界。\n'
+                    '评价依据：学生能独立填写追踪记录、解释边界并完成对应层级任务；未达成时回到具体状态追踪，不只重复结论。'},
+    ]
+
 
 def strategies(profile: ClassProfile):
     counts = {f.type: f for f in profile.facts}
@@ -70,6 +100,36 @@ def suggested_plan(profile):
         activities[1] = ('不变量论证', '追踪累加器；给出循环不变量、初始化/保持/退出论证。')
         activities[2] = ('终止性分析', '用递减量说明终止，辨析break的作用域与嵌套循环。')
         activities[4] = ('复杂度与练习', '完成约数与素数计数；解释最坏时间复杂度和空间复杂度。')
+    teaching_moves = [
+        ('出示条件判断和变量变化的诊断问题，邀请学生说明判断依据；按回答核实先修掌握情况。',
+         '独立作答后与同伴对照，标记不能解释的步骤；有提交障碍时向教师说明。',
+         '收集诊断回答；不能解释条件或更新的学生进入带提示的追踪任务，不把未交直接判为能力不足。'),
+        ('按当前课堂示例演示一轮执行；先遮住运行结果，让学生预测零次、一次与正常输入。',
+         '填写输入、当前变量、条件真假、本轮输出和更新后值，并用实际结果核对预测。',
+         '抽查追踪表是否包含循环前的首次判断；发现只记输出不记状态时，补做一轮口头追踪。'),
+        ('将初值、进入条件、循环体和更新方向并排展示，追问每一轮状态如何接近退出条件。',
+         '两人一组交替说明当前状态与下一轮条件；用自己的话说明循环结束的原因。',
+         '学生能指出决定终止的状态变化；不能说明时回到追踪表，不以运行未报错代替理解。'),
+        ('并列展示循环终点的两种写法，使用当前示例的零次/一次输入，引导学生逐项比较。',
+         '先手算应包含的首项和末项，再填写运行次数与输出，解释遗漏或多算发生在哪里。',
+         '检查学生能否解释终点是否包含；仍有混淆者先完成边界表，再进入进阶题。'),
+        ('先说明三档任务的输入输出契约和评分点；巡回记录困难发生在条件、更新还是筛选。',
+         '完成基础任务后选择进阶或挑战；提交代码、追踪记录和结果解释，保留失败后的修改依据。',
+         '按题目评分点反馈；代码依据固定测试，解释与适配由教师审核，公共倍数不得重复计入。'),
+        ('收取一条零次循环解释和一条退出条件说明，归纳共性疑问并安排后续练习。',
+         '独立提交出口反馈：说明何时不进入循环、状态如何更新，以及下一步需要的帮助。',
+         '根据出口回答区分已掌握与需再诊断内容，记录下一课的针对性跟进，不预填达成人数。'),
+    ]
+    if university:
+        teaching_moves[1] = ('示范不变量的初始化、保持和退出三步论证，再讨论计数结果。',
+                             '书写不变量并逐条核对三个阶段，用边界输入检查论证是否成立。',
+                             '检查论证是否覆盖空循环和最后一次更新；仅写术语不能视为完成证明。')
+        teaching_moves[2] = ('用递减量解释终止性，辨析嵌套循环中break退出的范围。',
+                             '指出每层循环的有限进展，解释break对内外层的不同作用。',
+                             '检查终止论证是否独立于测试结果，并核对复杂度分析的计数范围。')
+        teaching_moves[4] = ('讲清约数与素数任务的输入边界和评分要求，追问嵌套循环的计数范围。',
+                             '完成代码与初始化/保持/退出论证，分别说明终止性及最坏复杂度。',
+                             '分别评价代码测试证据、论证完整性和复杂度；仅输出正确不能代替证明。')
     example_tasks = ['sum', 'pairs'] if university else (['count', 'sum'] if emphasis != 'boundary' else ['count', 'even_sum'])
     exercise_tasks = ['sum', 'divisors', 'primes'] if university else ['countdown', 'even_sum', 'multiples']
     junior_scoring = [('初值与条件正确', 25), ('变量更新与结果正确', 35), ('零次/边界追踪解释', 40 if emphasis == 'boundary' else 20)]
@@ -78,7 +138,7 @@ def suggested_plan(profile):
     scoring = [('程序与输出正确', 50), ('循环不变量及终止性论证', 30), ('时间与空间复杂度分析', 20)] if university else junior_scoring
     exercises = []
     for i, (task, level) in enumerate(zip(exercise_tasks, ['基础', '进阶', '挑战'], strict=True), 1):
-        exercises.append({'id': f'exercise-{i}', 'title': f'{level}：{task}', 'task_id': task,
+        exercises.append({'id': f'exercise-{i}', 'title': TASK_LABELS[task], 'task_id': task,
             'knowledge_points': ['循环不变量', '终止性', '复杂度'] if university else ['计数', '累加', '条件更新'],
             'explanation': UNIVERSITY_NOTES[task] if university else '先手算，再填追踪表，最后运行核对。',
             'code': TASKS[task][2], 'level': level, 'prompt': TASKS[task][0],
@@ -102,15 +162,18 @@ def suggested_plan(profile):
             'teaching_intervention': action + (' 大学课要求用不变量和递减量说明。' if university else ''),
             'exercise_ids': [ex], 'stage': stage})
     return LessonPlan.model_validate({'stage': stage, 'prerequisites': ['变量', '输入输出', '条件语句'],
+        'overview': lesson_overview(profile, university),
         'goals': [{'id': 'goal-1', 'title': '解释循环执行与退出',
                    'criterion': '独立填写n=0/1/5的变量追踪表，正确指出条件更新。'},
                   {'id': 'goal-2', 'title': '循环不变量与复杂度' if university else '完成循环任务',
                    'criterion': '论证不变量与终止性，分析嵌套循环时间/空间复杂度。' if university else
                                 '用for/while完成计数与累加；解释零次与边界输入。'}],
         'segments': [{'id': f'segment-{i}', 'title': title, 'minutes': minute, 'activity': activity,
-                      'strategy_ids': refs} for i, ((title, activity), minute) in
+                      'strategy_ids': refs, 'teacher_actions': teaching_moves[i - 1][0],
+                      'student_actions': teaching_moves[i - 1][1], 'assessment': teaching_moves[i - 1][2]}
+                     for i, ((title, activity), minute) in
                      enumerate(zip(activities, minutes, strict=True), 1)],
-        'examples': [{'id': f'example-{i}', 'title': f'演示：{task}', 'task_id': task,
+        'examples': [{'id': f'example-{i}', 'title': f'演示：{TASK_LABELS[task]}', 'task_id': task,
                       'knowledge_points': ['嵌套循环', '复杂度'] if university and task == 'pairs' else ['循环', '条件更新'],
                       'explanation': '逐轮解释循环不变量和最坏复杂度。' if university else
                                      '逐轮记录变量，比较零次、一次和正常循环。', 'code': TASKS[task][2]}

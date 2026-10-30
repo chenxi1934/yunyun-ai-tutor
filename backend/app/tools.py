@@ -105,8 +105,10 @@ class Registry:
 
     @staticmethod
     def _diff(path: str, original: str, content: str) -> str:
-        return "".join(difflib.unified_diff(original.splitlines(keepends=True),
-                       content.splitlines(keepends=True), fromfile=path, tofile=path + "（草稿）"))
+        lines = difflib.unified_diff(original.splitlines(keepends=True),
+                    content.splitlines(keepends=True), fromfile=path, tofile=path + "（草稿）")
+        return "".join(line if line.endswith('\n') else line + '\n\\ No newline at end of file\n'
+                       for line in lines)
 
     def begin(self, call, session):
         if call["name"] != "run_python_tests" or not self.verification:

@@ -147,6 +147,7 @@ async function lateProfile(browser,engine,baseURL) {
     await page.waitForFunction(()=>!!window.__releaseProfileText);
     await select(page,'B');await page.evaluate(()=>window.__releaseProfileText());await frame(page);await assertB(page);
     assert.equal(await page.locator('input[type=file]').inputValue(),'');
+    await page.locator('.profile-input summary').click();
     assert.equal(await page.getByRole('textbox',{name:'汇总班情',exact:true}).inputValue(),'');
     assert.equal(await page.getByRole('combobox',{name:'班情格式',exact:true}).inputValue(),'text');
     assert.deepEqual(errors,[]);output.cases.push({engine,case:'迟到A班情读取及原生文件选择不污染B',status:'PASS'});
@@ -191,7 +192,7 @@ async function uploadCases(browser,engine,baseURL) {
     for(const item of cases) {
       await page.locator('input[type=file]').setInputFiles({name:item.name,mimeType:'application/octet-stream',buffer:item.raw});
       const response=page.waitForResponse(r=>r.url().includes('/class-profiles/upload?'));
-      await page.getByRole('button',{name:'更新当前班情',exact:true}).click();const r=await response;
+      await page.getByRole('button',{name:'保存班情补充',exact:true}).click();const r=await response;
       assert.equal(r.status(),201);assert.equal((await r.json()).profile.source_hash,hash(item.raw));
       const wire=uploads.at(-1);assert(wire.raw.equals(item.raw));assert.equal(wire.headers['content-type'],'application/octet-stream');
       await page.waitForFunction(()=>!document.querySelector('.composer button[type=submit]').disabled);await frame(page);
@@ -200,7 +201,7 @@ async function uploadCases(browser,engine,baseURL) {
     const count=uploads.length;
     await page.locator('input[type=file]').setInputFiles({name:'too-large.json',mimeType:'application/json',buffer:profileBytes(1048577)});
     await page.getByRole('alert').filter({hasText:'上传上限为1 MiB'}).waitFor();assert.equal(uploads.length,count);
-    assert.equal(await page.getByRole('button',{name:'更新当前班情',exact:true}).isDisabled(),true);assert.deepEqual(errors,[]);
+    assert.equal(await page.getByRole('button',{name:'保存班情补充',exact:true}).isDisabled(),true);assert.deepEqual(errors,[]);
     output.cases.push({engine,case:'超过1MiB在前端明确拒绝',status:'PASS'});
   } finally {await context.close();}
 }

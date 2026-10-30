@@ -15,7 +15,14 @@ class Fact(StrictModel):
     denominator: int | None = Field(default=None, ge=1, le=1000)
     source_ref: str
     observation: str
+    source_hash: str | None = None
     status: Literal['observed'] = 'observed'
+
+
+class ProfileSource(StrictModel):
+    format: Literal['text', 'json', 'csv']
+    source_hash: str
+    origin: Literal['manual', 'upload', 'request', 'legacy']
 
 
 class ClassProfile(StrictModel):
@@ -29,7 +36,8 @@ class ClassProfile(StrictModel):
     prior_knowledge: list[str]
     source_hash: str
     source_format: Literal['text', 'json', 'csv']
-    facts: list[Fact] = Field(min_length=1, max_length=3)
+    facts: list[Fact] = Field(max_length=3)
+    sources: list[ProfileSource] = Field(default_factory=list)
     unknowns: list[str]
     created_at: str
 
@@ -51,10 +59,18 @@ class Goal(Item):
     criterion: str = Field(min_length=1, max_length=500)
 
 
+class OverviewSection(Item):
+    kind: Literal['content', 'learners', 'focus']
+    content: str = Field(min_length=1, max_length=2400)
+
+
 class Segment(Item):
     minutes: int = Field(ge=1, le=45)
     activity: str = Field(min_length=1, max_length=1200)
     strategy_ids: list[str] = Field(min_length=1)
+    teacher_actions: str = Field(default='', max_length=1200)
+    student_actions: str = Field(default='', max_length=1200)
+    assessment: str = Field(default='', max_length=1200)
 
 
 class CodeItem(Item):
@@ -99,6 +115,7 @@ class LessonPlan(StrictModel):
     topic: Literal['循环结构'] = '循环结构'
     duration_minutes: Literal[45] = 45
     prerequisites: list[str] = Field(min_length=1, max_length=12)
+    overview: list[OverviewSection] = Field(default_factory=list, max_length=3)
     goals: list[Goal] = Field(min_length=2, max_length=5)
     segments: list[Segment] = Field(min_length=3, max_length=10)
     examples: list[CodeItem] = Field(min_length=2, max_length=3)
@@ -107,6 +124,9 @@ class LessonPlan(StrictModel):
 
     @model_validator(mode='after')
     def integrity(self):
+        if self.overview and (len(self.overview) != 3 or
+                              {s.kind for s in self.overview} != {'content', 'learners', 'focus'}):
+            raise ValueError('教案分析须覆盖教学内容、学情及重点难点策略，各一项')
         if sum(s.minutes for s in self.segments) != 45:
             raise ValueError('教学环节总时间必须为45分钟')
         if {e.level for e in self.exercises} != {'基础', '进阶', '挑战'}:
@@ -121,7 +141,7 @@ class LessonPlan(StrictModel):
         return self
 
     def items(self):
-        return [*self.goals, *self.segments, *self.examples, *self.exercises, *self.misconceptions]
+        return [*self.overview, *self.goals, *self.segments, *self.examples, *self.exercises, *self.misconceptions]
 
 
 class EducationContext(StrictModel):
@@ -144,6 +164,7 @@ class ImportProfile(StrictModel):
     format: Literal['text', 'json', 'csv']
     content: str = Field(min_length=1, max_length=1048576)
     expected_revision: int = Field(ge=0)
+    mode: Literal['replace', 'supplement'] = 'replace'
 
 
 class ReviseItem(StrictModel):

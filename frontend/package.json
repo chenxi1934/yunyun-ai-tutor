@@ -5,13 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "test:markdown": "node --test tests/chat-message.test.mjs",
+    "test:verification": "node --test tests/verification-feedback.test.mjs",
+    "test:diagnostics": "node --test tests/diagnostics-diff.test.mjs",
+    "test:lesson": "node --test tests/lesson-workflow.test.mjs",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "lucide-react": "0.468.0"
+    "lucide-react": "0.468.0",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@types/react": "19.2.0",

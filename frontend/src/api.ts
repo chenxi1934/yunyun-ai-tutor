@@ -9,7 +9,7 @@ export interface VerificationReport {
   cases: { id: string; input: string; expected: string; actual: string; stdout: string; stderr: string
     exit_code: number | null; duration_ms: number; status: string; error: string | null }[]
 }
-export interface Approval { id: string; draft_id: string | null; status: string; entries?: Entry[]; snapshot_hash?: string; commit_id?: string }
+export interface Approval { id: string; draft_id: string | null; status: string; entries?: Entry[]; snapshot_hash?: string; commit_id?: string; lesson_id?: string; lesson_revision?: number }
 export interface AgentEvent { event_id: number; type: string; timestamp: string; payload: Record<string, unknown> }
 export interface Snapshot {
   session: Session; messages: { role: string; content: string | null }[]; runs: Run[]
@@ -42,8 +42,8 @@ export function api<T>(path: string, body?: unknown, method?: string): Promise<T
     body: body === undefined ? undefined : JSON.stringify(body) })
 }
 
-export function uploadProfile(sid: string, file: File, format: string, revision: number): Promise<unknown> {
-  const query = new URLSearchParams({ format, expected_revision: String(revision) })
+export function uploadProfile(sid: string, file: File, format: string, revision: number, mode: 'replace' | 'supplement' = 'replace'): Promise<unknown> {
+  const query = new URLSearchParams({ format, expected_revision: String(revision), mode })
   return request(`/sessions/${sid}/class-profiles/upload?${query}`, {
     method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file,
   })
@@ -58,6 +58,7 @@ export interface Recovery {
 
 export interface TeachingItem {
   id: string; title: string; criterion?: string; minutes?: number; activity?: string
+  kind?: string; content?: string; teacher_actions?: string; student_actions?: string; assessment?: string
   task_id?: string; knowledge_points?: string[]; explanation?: string; code?: string
   level?: string; prompt?: string; scaffolding?: string; scoring?: { criterion: string; points: number }[]
   basis?: string; evidence_ids?: string[]; trigger?: string; cause?: string
@@ -65,14 +66,16 @@ export interface TeachingItem {
 }
 export interface Lesson {
   lesson_id: string; revision: number; content_hash: string; code_status: string
-  candidate_ready: boolean; delivery_ready: boolean; profile_stale: boolean; curriculum_risks: string[]
+  candidate_ready: boolean; delivery_ready: boolean; profile_stale: boolean; curriculum_risks: (string | { item_id: string; reason: string })[]
   plan: { stage: string; topic: string; prerequisites: string[]; duration_minutes: number
-    goals: TeachingItem[]; segments: TeachingItem[]; examples: TeachingItem[]; exercises: TeachingItem[]; misconceptions: TeachingItem[] }
-  items: Record<string, { review_status: string; current_pass?: boolean; verification_status?: string; draft_id?: string }>
-  profile: { facts: { id: string; observation: string; count: number; source_ref: string }[]; unknowns: string[] }
+    overview?: TeachingItem[]; goals: TeachingItem[]; segments: TeachingItem[]; examples: TeachingItem[]; exercises: TeachingItem[]; misconceptions: TeachingItem[] }
+  items: Record<string, { review_status: string; review_note?: string | null; reviewed_at?: string | null; current_pass?: boolean; verification_status?: string; draft_id?: string }>
+  profile: { class_size?: number | null; prior_knowledge?: string[]; revision?: number
+    facts: { id: string; observation: string; count: number; source_ref: string; source_hash?: string | null }[]; unknowns: string[]
+    sources?: { format: string; origin: string; source_hash: string }[] }
   strategies: { id: string; action: string; target: string; evidence_ids: string[] }[]
 }
-export interface Commit { id: string; status: string; created_at: string; applied: string[]; lesson_id?: string }
+export interface Commit { id: string; status: string; created_at: string; applied: string[]; lesson_id?: string; lesson_revision?: number }
 export interface Entry { path: string; operation: string; base_hash: string | null; content_hash: string | null; diff: string; before_mode?: number | null; content_mode?: number | null }
 
 export async function download(path: string, name: string) {

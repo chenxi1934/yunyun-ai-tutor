@@ -322,27 +322,39 @@ def test_education_current_turn_compaction_preserves_raw_history_and_errors(setu
     assert dumps(store.messages(sid)) == raw
 
 
-def test_single_saved_lesson_compacts_below_old_threshold(setup_agent):
+@pytest.mark.parametrize('legacy', [True, False], ids=['legacy-window', 'rich-plan'])
+def test_single_saved_lesson_compacts_below_old_threshold(setup_agent, legacy):
     agent, store, session, _, view = prepare(setup_agent)
     sid, call_id, context_id = session['id'], uid(), uid()
     # 单份完整提案加模板结果：真实失败历史为22538字节，低于旧24000阈值。
     store.message(sid, 'fixture', {'role': 'user', 'content': '生成后按固定用例真实验证。'})
     store.message(sid, 'fixture', {'role': 'assistant', 'content': None, 'tool_calls': [{
         'id': context_id, 'type': 'function', 'function': {'name': 'get_education_context', 'arguments': '{}'}}]})
-    context_result = {'ok': True, 'data': agent.education.context(sid)}
+    context_data = agent.education.context(sid)
+    wire_plan = json.loads(dumps(view['plan']))
+    if legacy:
+        wire_plan.pop('overview', None)
+        for segment in wire_plan['segments']:
+            for field in ('teacher_actions', 'student_actions', 'assessment'):
+                segment.pop(field, None)
+        context_data['suggested_plan'] = wire_plan
+    context_result = {'ok': True, 'data': context_data}
     store.message(sid, 'fixture', {'role': 'tool', 'tool_call_id': context_id, 'content': dumps(context_result)})
     store.put('calls', {'id': context_id, 'session_id': sid, 'run_id': 'fixture',
                        'name': 'get_education_context', 'status': 'DONE', 'result': context_result})
     store.message(sid, 'fixture', {'role': 'assistant', 'content': None, 'tool_calls': [{
         'id': call_id, 'type': 'function', 'function': {'name': 'propose_lesson',
-        'arguments': dumps({'plan': view['plan'], 'profile_id': view['profile_ref'][0],
+        'arguments': dumps({'plan': wire_plan, 'profile_id': view['profile_ref'][0],
                            'profile_revision': 1, 'base_revision': 0})}}]})
     result = {'ok': True, 'data': {'lesson_id': view['lesson_id']}}
     store.message(sid, 'fixture', {'role': 'tool', 'tool_call_id': call_id, 'content': dumps(result)})
     store.put('calls', {'id': call_id, 'session_id': sid, 'run_id': 'fixture',
                        'name': 'propose_lesson', 'status': 'DONE', 'result': result})
     raw = dumps(store.messages(sid))
-    assert 16000 < len(raw.encode()) < 24000
+    if legacy:
+        assert 16000 < len(raw.encode()) < 24000
+    else:
+        assert len(raw.encode()) > 24000
     context = agent.context(session)
     assert len(dumps(context).encode()) < len(raw.encode())
     assert context[-3:] == [store.messages(sid)[0], *store.messages(sid)[-2:]]

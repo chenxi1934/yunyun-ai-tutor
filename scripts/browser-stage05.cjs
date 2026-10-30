@@ -94,12 +94,13 @@ async function scenario(browser, name, url, stage, className, pc=false) {
     await page.route('**/verify',delayedVerify);
     const running=responseClick(page,page.getByRole('button',{name:'运行全部代码测试',exact:true}),'/verify');
     await page.getByRole('status').filter({hasText:'正在执行真实代码测试'}).waitFor();
-    assert.equal(await page.getByRole('button',{name:'运行全部代码测试',exact:true}).isEnabled(),false);
+    await page.getByRole('region',{name:'代码验证反馈'}).getByRole('status').filter({hasText:'正在检查并测试代码'}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'正在测试…',exact:true}).isEnabled(),false);
     await page.screenshot({path:path.join(evidence,`${stem}-${name}-verifying.png`),fullPage:true});
     await running;await page.unroute('**/verify',delayedVerify);
     s=await state(page);lesson=s.lessons.at(-1);assert.equal(lesson.items[item.id].verification_status,'OUTPUT_MISMATCH');
     const bad=s.verification_reports.find(r=>r.draft_id===lesson.items[item.id].draft_id);assert(bad.cases.some(c=>c.actual!==c.expected));
-    await article.getByText(/OUTPUT_MISMATCH/).first().waitFor();
+    await article.locator('.report > summary').filter({hasText:'OUTPUT_MISMATCH'}).last().waitFor();
     assert.equal(await article.getByRole('button',{name:'接受',exact:true}).isEnabled(),false);
     const rejected=await page.request.get(`/api/sessions/${s.session.id}/lessons/${lesson.lesson_id}/package`);
     assert.equal(rejected.status(),409);
@@ -118,7 +119,7 @@ async function scenario(browser, name, url, stage, className, pc=false) {
     output.failure_repair={blocked_package:409,blocked_delivery:409,validation_error_display:'PASS',loading_display:'PASS',status:'PASS',failed_case:bad.cases.find(c=>c.status!=='PASS'),test_spec_unchanged:true};
   }
   await page.getByRole('textbox',{name:'审核说明（可选）',exact:true}).fill('自动化合成审核动作，仅检验交付流程，不代表人工教育审核');
-  for (const [tab,items] of [['教案',[...lesson.plan.goals,...lesson.plan.segments]],['示例代码',lesson.plan.examples],['分层练习',lesson.plan.exercises],['错因预警',lesson.plan.misconceptions]]) {
+  for (const [tab,items] of [['教案',[...(lesson.plan.overview||[]),...lesson.plan.goals,...lesson.plan.segments]],['示例代码',lesson.plan.examples],['分层练习',lesson.plan.exercises],['错因预警',lesson.plan.misconceptions]]) {
     await page.getByRole('tab',{name:tab,exact:true}).click();
     for(const item of items){
       const article=page.getByRole('article',{name:item.title,exact:true});

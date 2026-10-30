@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from typing import Literal
 
 from fastapi import Request
 
@@ -14,6 +15,19 @@ from app.education.models import (
 
 def register_education(app, agent, session, result, execution_lock):
     store, education = agent.store, agent.education
+
+    @app.get('/api/class-profile-templates/{format}')
+    async def profile_template(format: Literal['csv', 'json']):
+        from fastapi.responses import Response
+        if format == 'csv':
+            content = '\ufefftype,count,class_size,说明\nnot_submitted,5,40,未交作业人数\ninfinite_loop,3,40,while死循环人数\n'
+            media_type = 'text/csv'
+        else:
+            content = dumps({'class_size': 40, 'prior_knowledge': ['条件语句'],
+                'facts': [{'type': 'not_submitted', 'count': 5}, {'type': 'infinite_loop', 'count': 3}]})
+            media_type = 'application/json'
+        return Response(content, media_type=media_type,
+                        headers={'Content-Disposition': f'attachment; filename="class-profile-example.{format}"'})
 
     @contextmanager
     def mutation(request, sid, expected_revision=None):
@@ -39,11 +53,12 @@ def register_education(app, agent, session, result, execution_lock):
     @app.post('/api/sessions/{sid}/class-profiles', status_code=201)
     async def import_profile(request: Request, sid: str, body: ImportProfile):
         with mutation(request, sid, body.expected_revision) as value:
-            profile = education.import_profile(value, body.content, body.format)
+            profile = education.import_profile(value, body.content, body.format, mode=body.mode)
         return result(request, {'profile': profile})
 
     @app.post('/api/sessions/{sid}/class-profiles/upload', status_code=201)
-    async def upload_profile(request: Request, sid: str, format: str, expected_revision: int):
+    async def upload_profile(request: Request, sid: str, format: str, expected_revision: int,
+                             mode: Literal['replace', 'supplement'] = 'replace'):
         session(request, sid)
         content = bytearray()
         async for chunk in request.stream():
@@ -57,7 +72,7 @@ def register_education(app, agent, session, result, execution_lock):
         if format not in {'json', 'csv'}:
             raise AppError('INVALID_CLASS_DATA', '文件上传支持JSON或CSV。', 422)
         with mutation(request, sid, expected_revision) as value:
-            profile = education.import_profile(value, text, format, source=bytes(content))
+            profile = education.import_profile(value, text, format, source=bytes(content), mode=mode, origin='upload')
         return result(request, {'profile': profile})
 
     @app.get('/api/sessions/{sid}/education-context')

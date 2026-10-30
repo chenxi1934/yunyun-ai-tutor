@@ -584,3 +584,46 @@ Firefox在本机macOS图形子进程启动失败（sandbox extension / framebuff
 ## 2026-10-30：用户授权本地提交
 
 用户明确要求“git提交掉”，将阶段06修复、全部模型预算移除、回归与最终交付材料合为本地提交；未执行push。提交前核对代码/测试Hash与已通过的218项后端验收版本一致，单页PDF也未变；本轮没有重跑完整测试或更改业务代码。暂存区敏感信息及空白错误检查通过，.env、运行证据/数据库、依赖和构建产物保持忽略。README与ACCEPTANCE同步本地提交/远端未同步的区别；历史失败、教师审核/现场/视频等未完成状态保留，详见ACCEPTANCE第21节。
+
+## 2026-10-30：进入线上验收与体验优化
+
+按用户要求，以实际线上反馈驱动后续最小必要修改，区分 Bug、体验优化和新需求；统一维护 [UAT_ISSUES.md](UAT_ISSUES.md)。本轮开始时 `git status --short` 为空，尚未收到具体问题，仅初始化记录及阶段入口，无业务代码变更。
+
+本轮未运行功能测试、未启动服务或浏览器，功能验证为 `NOT_TESTED`；不新增功能 PASS，不改变阶段06历史证据与未完成项。无需重新部署，未提交或推送 Git，未操作线上环境。
+
+## 2026-10-30：UAT-001 修复对话 Markdown 展示
+
+定位为前端 Bug：模型原文经存储/API 正常返回，`App.tsx` 直接用段落展示而未渲染 Markdown。新增独立消息组件，接入用户已授权的 `react-markdown`/`remark-gfm` 及必要锁文件，补充消息范围内的排版、代码/表格滚动和安全链接；教师输入与 Mock 标识保留，后端业务代码和接口未变。
+
+实际组件测试先复现 **2 PASS / 7 FAIL**，修复后 `npm --prefix frontend run test:markdown` 为 **9 PASS / 0 FAIL / 0 skipped**；`npm --prefix frontend run build`（含 TypeScript）及 `git diff --check` **PASS**。按 ui-ux 轻量流程与 web-design-guidelines 检查本轮代码的标题层级、列表语义、焦点、链接及溢出处理；无浏览器验证，不将代码检查等同视觉验收。
+
+需要部署本次前端构建；当前待部署及用户线上确认。浏览器/窄屏/历史会话实测为 `NOT_TESTED`，本轮未启动服务、浏览器，未运行真实模型/Runner 或后端全量回归，未提交/推送 Git 或操作线上。复现、文件、命令和手动验收步骤见 [UAT-001](UAT_ISSUES.md#uat-001ai-对话中的-markdown-未渲染)。
+
+## 2026-10-30：UAT-002 精简继续对话输入区
+
+按用户截图反馈做体验优化：`App.tsx` 将教学上下文与班情合并到可折叠设置，新建会话默认展开，已有会话默认收起并显示摘要；继续对话保留一行输入与发送按钮。`styles.css` 限制展开区高度、保留设置入口及错误提示。仅调整前端展示，保留既有业务处理和本轮前已有改动；适配 `review-stage05-browser.cjs` 中切换会话后读取班情控件的展开步骤，原断言不变。
+
+`npm --prefix frontend run build`（含 TypeScript）、`node --check scripts/review-stage05-browser.cjs`、`git diff --check` **PASS**；原有 Markdown 组件回归 **9 PASS**，不等同折叠交互验收。无新增依赖，无服务/浏览器启动；实际视觉、折叠/恢复/班情更新与窄屏交互仍 `NOT_TESTED`。需部署新前端，未提交/推送 Git 或部署。手动步骤及处理结果见 [UAT_ISSUES.md](UAT_ISSUES.md)。
+
+## 2026-10-30：UAT-003 加强代码测试操作反馈
+
+定位为体验问题：等待提示与操作位置分离，完成后没有集中汇总。新增 `VerificationFeedback.tsx` 并在 `EducationWorkspace.tsx` 接入，就近显示测试中、检查结束时间、有效报告的代码/用例数量与逐项状态；未全部通过时自动展开，报告可直接定位。说明有效报告复用，保留旧报告/过期/请求异常与代码失败的区别；编辑期间禁用报告跳转，教师审批和交付仍由原有后端状态决定。
+
+`npm --prefix frontend run test:verification` **11 PASS**；`npm --prefix frontend run test:markdown` **9 PASS**；`npm --prefix frontend run build`（TypeScript + Vite，1839 模块）、`node --check scripts/browser-stage05.cjs`、`git diff --check` **PASS**。测试为纯函数/React 静态渲染夹具，不冒充真实 Runner 或浏览器验收。未新增依赖、未改后端、未启动服务或浏览器；交互/视觉/线上主线仍 `NOT_TESTED`，需部署新前端及用户确认，未提交/推送 Git 或部署。详见 [UAT_ISSUES.md](UAT_ISSUES.md)。
+
+## 2026-10-30：UAT-004～006 易读验证诊断与 Diff
+
+将原技术状态替换为情况、证据与下一步建议，保留当前有效报告与教师审核边界；输入、预期和实际输出分别展示并标注空白。新增共享 `VerificationDiagnostic.tsx`、`DiffView.tsx`，在教案/独立草稿及审批/回退界面复用，Diff 包含版本方向、行号、增删与字符高亮，同时保留原文。
+
+排查时真实复现 `Registry._diff` 将无末尾换行的旧/新代码拼成同一行；在 `backend/app/tools.py` 最小补齐标准无换行标记，未修改代码内容或旧审批快照。专项先 **6 FAIL / 6 PASS**，修复后 Diff/策略/教育定向单元 **81 PASS（0.51秒）**；实际“后端生成 → 前端解析”无换行链路 PASS。前端诊断/Diff **21 PASS**、验证汇总 **11 PASS**、Markdown **9 PASS**；TypeScript/Vite（1841模块）、改动文件 Ruff、浏览器脚本语法和 Diff 检查 PASS。
+
+无新增依赖或服务/浏览器启动；上述测试不代表真实模型/Runner或浏览器验收。需部署前后端，未提交/推送 Git 或部署；实际视觉、诊断重测入口及审批/回退交互仍 `NOT_TESTED`。历史不规范差异保留原文，未回写证据。命令、分类与手动步骤见 [UAT_ISSUES.md](UAT_ISSUES.md)。
+
+
+## 2026-10-30：UAT-007～013 教案、班情与审阅交付体验
+
+完成拒绝持续反馈与分项统计；教案扩展为五节，分析与教学过程更完整，审批/历史/Markdown导出保留结构；错因改用观察和练习名称。增加合成班情样例、补充/明确替换、需求中明确班情的事务整理，去掉默认A班。状态与审阅操作移到正文上方，交付区解释阻塞并可定位，下载匹配当前正式版本，文件列表限高且可折叠。历史记录不回写，代码冻结契约、真实执行和正式审批边界不放宽。
+
+实际定向后端 **215 PASS（11.27秒）**；前端 **60 PASS**（19项新工作流+41项既有回归），为纯函数/SSR；Ruff与两份浏览器脚本语法检查PASS。首次尝试pytest importlib模式因现有conftest导入方式收集失败，改用项目默认模式后完整定向集通过，未修改断言或pytest配置。旧窗口压缩回归保留原16k～24k断言，另测丰富教案大于24k场景。线上与本地系统/工具策略Hash实测一致，未改变已有恢复配置。
+
+用户最新已授权提交Git和部署；准备沿用增量API/前端发布，保留原Runner、运行配置、会话与工作区，实际发布后另记证据。当前尚未进行本版浏览器、真实模型或真实Runner验收；教师专业审核保持NOT_TESTED。分类、原因、具体文件及用户手动步骤见 [UAT_ISSUES.md](UAT_ISSUES.md)。

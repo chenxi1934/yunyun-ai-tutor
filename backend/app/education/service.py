@@ -6,8 +6,8 @@ from pydantic import ValidationError
 
 from app.domain import AppError, dumps, now, sha, uid
 from app.education.catalog import cases, contract
-from app.education.models import ClassProfile, LessonPlan
-from app.education.profiles import parse_profile
+from app.education.models import ClassProfile, LessonPlan, ProfileSource
+from app.education.profiles import parse_profile, request_profile_text, supplement_profile
 from app.education.rules import curriculum_risks, strategies, suggested_plan, validate_grounding
 
 
@@ -26,7 +26,8 @@ class EducationService:
             raise AppError('PROFILE_REQUIRED', '请先导入当前会话的汇总班情。', 409)
         return ClassProfile.model_validate(matches[-1])
 
-    def import_profile(self, session, content, format, *, source: bytes | None = None):
+    def import_profile(self, session, content, format, *, source: bytes | None = None,
+                       mode='replace', origin='manual', allow_empty=False):
         previous = self.profiles(session['id'])
         last = previous[-1]['profile'] if previous else None
         context = session['context']
@@ -34,16 +35,36 @@ class EducationService:
             raise AppError('TOPIC_NOT_SUPPORTED', '阶段04只支持循环结构。', 422)
         try:
             profile = parse_profile(content, format, context['stage'], context.get('grade', ''),
-                                    last['revision'] + 1 if last else 1, last['id'] if last else None)
+                                    last['revision'] + 1 if last else 1, last['id'] if last else None,
+                                    allow_empty=allow_empty)
         except ValidationError:
             raise AppError('INVALID_CLASS_DATA', '班情字段不符合结构协议。', 422) from None
         if source is not None:
             profile.source_hash = hashlib.sha256(source).hexdigest()
+        profile.sources = [ProfileSource(format=format, source_hash=profile.source_hash, origin=origin)]
+        for fact in profile.facts:
+            fact.source_hash = profile.source_hash
+        if mode not in {'replace', 'supplement'}:
+            raise AppError('INVALID_CLASS_DATA', '班情更新方式无效。', 422)
+        if mode == 'supplement' and last:
+            previous = ClassProfile.model_validate(last)
+            profile = supplement_profile(previous, profile)
+            if profile.revision == previous.revision:
+                return profile.model_dump()
         self.store.put('class_profiles', {'id': uid(), 'session_id': session['id'],
                                          'profile': profile.model_dump()})
         self.store.event(session['id'], None, 'class_profile.imported',
                          {'profile_id': profile.id, 'revision': profile.revision, 'source_hash': profile.source_hash})
         return profile.model_dump()
+
+    def apply_request_profile(self, session, text):
+        if session['context'].get('topic', '循环结构') != '循环结构':
+            return
+        extracted = request_profile_text(text)
+        if extracted is None and self.profiles(session['id']):
+            return
+        self.import_profile(session, extracted or '', 'text', mode='supplement', origin='request',
+                            source=text.encode('utf-8'), allow_empty=True)
 
     def context(self, sid):
         profile = self.profile(sid)
@@ -52,7 +73,10 @@ class EducationService:
                 'suggested_plan': plan.model_dump(),
                 'contracts': {i.task_id: contract(i.task_id) for i in
                               [*plan.examples, *plan.exercises]},
-                'notice': '建议草稿由确定性规则提供，尚未测试/审核；模型可改写教学内容和代码，不能改固定测试。'}
+                'notice': '建议草稿由确定性规则提供，尚未测试/审核；模型可改写教学内容和代码，不能改固定测试。'
+                          'overview的content/learners/focus分别为可审核的内容分析、学情分析和重点难点策略。'
+                          '请结合教师当前需求细化这些章节，以及每个环节的teacher_actions、student_actions、assessment；'
+                          '不要只复述标题，不得虚构学生人数、观察病因或完成测试。'}
 
     def tool_result(self, view):
         result = {k: view[k] for k in ('lesson_id', 'revision', 'code_status', 'teacher_review_status',
@@ -86,6 +110,10 @@ class EducationService:
         parent = records[-1] if records else None
         if (parent['revision'] if parent else 0) != base_revision:
             raise AppError('REVISION_CONFLICT', '教案版本已变化。', 409)
+        if not plan.overview:
+            if parent and parent['plan'].get('overview'):
+                raise AppError('ITEM_SET_CHANGED', '修订须保留已有教学分析章节。', 422)
+            plan.overview = suggested_plan(profile).overview
         lesson_id = parent['lesson_id'] if parent else uid()
         return self._save(session, lesson_id, plan, profile, parent, run_id, '生成结构化教案')
 
@@ -95,9 +123,13 @@ class EducationService:
         old_plan = LessonPlan.model_validate(parent['plan']) if parent else None
         old_items = {i.id: i.model_dump() for i in old_plan.items()} if old_plan else {}
         global_change = parent and (parent['profile_ref'] != [profile.id, profile.revision]
-                                   or old_plan.prerequisites != plan.prerequisites)
-        if parent and set(old_items) != {i.id for i in plan.items()}:
-            raise AppError('ITEM_SET_CHANGED', '修订须保留所有稳定ID，不能删除失败或被拒项目。', 422)
+                                   or old_plan.prerequisites != plan.prerequisites
+                                   or old_plan.overview != plan.overview)
+        if parent:
+            new_ids = {i.id for i in plan.items()}
+            additions = {i.id for i in plan.overview} if not old_plan.overview else set()
+            if not set(old_items) <= new_ids or new_ids - set(old_items) - additions:
+                raise AppError('ITEM_SET_CHANGED', '修订须保留所有稳定ID，不能删除失败或被拒项目。', 422)
         code_items = [*plan.examples, *plan.exercises]
         for item in code_items:
             old_task = old_items.get(item.id, {}).get('task_id')
@@ -165,8 +197,8 @@ class EducationService:
         self.expect(record, body.expected_revision)
         value = json.loads(dumps(record['plan']))
         found = False
-        for group in ('goals', 'segments', 'examples', 'exercises', 'misconceptions'):
-            for index, item in enumerate(value[group]):
+        for group in ('overview', 'goals', 'segments', 'examples', 'exercises', 'misconceptions'):
+            for index, item in enumerate(value.get(group, [])):
                 if item['id'] == body.item_id:
                     if body.replacement.get('id') != body.item_id:
                         raise AppError('STABLE_ID_REQUIRED', '修订必须保留项目ID。', 422)
@@ -220,8 +252,10 @@ class EducationService:
         profile = self.profile(sid, *record['profile_ref'])
         reviews, items = self.reviews(record), {}
         for item in plan.items():
+            review = reviews.get(item.id, {})
             info = {'revision': record['item_revisions'][item.id], 'review_status':
-                    {'accept': 'ACCEPTED', 'reject': 'REJECTED'}.get(reviews.get(item.id, {}).get('decision'), 'PENDING')}
+                    {'accept': 'ACCEPTED', 'reject': 'REJECTED'}.get(review.get('decision'), 'PENDING'),
+                    'review_note': review.get('note'), 'reviewed_at': review.get('created_at')}
             if item.id in record['bindings']:
                 draft = self.store.get('drafts', record['bindings'][item.id])
                 spec = self.verification.latest_spec(sid, draft['path'])

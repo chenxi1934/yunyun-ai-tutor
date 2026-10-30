@@ -101,6 +101,7 @@ class Agent:
                 raise AppError("RUN_ACTIVE", "请先继续、取消或处理当前任务的审批。", 409)
             if session["model"] != self.settings.llm_model or session["provider"] != self.settings.llm_provider:
                 raise AppError("CONFIG_CHANGED", "会话模型配置已变化，请创建新会话。", 409)
+            self.education.apply_request_profile(session, text)
             run = {"id": uid(), "session_id": sid, "status": "READY", "model": session["model"],
                    "idempotency_key": key, "request_hash": sha(text), "config": self._config(),
                    "steps": 0, "tool_count": 0, "active_seconds": 0, "retry_count": 0,
