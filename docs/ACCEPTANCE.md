@@ -735,3 +735,6 @@ NOT_TESTED：当前51006加载新界面与macOS实际打开操作（尚未重启
 - PASS/边界：51006原DB重启/转正式HTTPS前后全部逻辑记录一致，持久后台进程无自动到期，无SSH依赖；开始阅读/打开文件夹真实POST200，创建正确标题本地HTML标签，无重复写入。浏览器file协议正文观察被明确策略拒绝，Finder视觉因Mac锁屏受阻，未绕过，二者视觉均NOT_TESTED。设计PDF由当前MD更新，PDFKit1页/1324字符、渲染已查看。
 
 剩余人工项：≤5分钟真实演示视频（必须包含故意失败）、面试现场机器预演、教师专业审查与邮件正式提交。GitHub Actions未配置，不声称CI PASS；本轮Git授权已明确，最终分支/完整SHA和包清单以delivery-metadata.json为准。
+
+
+最终同步补记：功能提交`1e714ccc0a67bebf4f2e4806b1104916a8db47fd`已正常快进推送PUBLIC仓库master，远端回读一致；27模块与公网资源逐文件匹配该提交，镜像标签仍记录构建基线421d225，精确对应以源码清单Hash为准。Actions工作流/运行均0（NOT_CONFIGURED）。下载包5份实际代码另补最大输入5项PASS，独立数学期望比对，未改原17条报告/冻结规格，证据`desktop-final-upper-bound.json`。后续仅本段等文档补记，无需再次部署；最终HEAD和完整历史在交付metadata/bundle中。

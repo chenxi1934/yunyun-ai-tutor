@@ -705,3 +705,6 @@ A将标题与状态/审阅操作放在同一行，标题左、控件右，统一
 用户原51006会话和DB保留，现直接连接正式HTTPS，无候选SSH依赖；后台进程无自动到期。开始阅读/打开文件夹POST实际200，阅读创建正确标题本地标签；fileURL浏览器视觉被安全策略拒绝、Finder视觉因Mac锁屏受阻，未绕过。设计PDF已更新、PDFKit实测1页并查看渲染。源码提交/推送及最终五件套打包按本轮明确授权继续，最终SHA以metadata与Git日志为准。证据集中`.runtime/desktop-final-*`、`local-delivery-native.json`、`final-local-service.json`。
 
 复用教训：验收服务不能沿用测试脚本的定时清理；桌面已确认的材料优先直接阅读，避免让用户再次下载和选目录。
+
+
+最终同步补记：功能提交`1e714ccc0a67bebf4f2e4806b1104916a8db47fd`已正常快进推送PUBLIC仓库master，远端回读一致；27模块与公网资源逐文件匹配该提交，镜像标签仍记录构建基线421d225，精确对应以源码清单Hash为准。Actions工作流/运行均0（NOT_CONFIGURED）。下载包5份实际代码另补最大输入5项PASS，独立数学期望比对，未改原17条报告/冻结规格，证据`desktop-final-upper-bound.json`。后续仅本段等文档补记，无需再次部署；最终HEAD和完整历史在交付metadata/bundle中。
